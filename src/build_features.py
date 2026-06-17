@@ -88,7 +88,7 @@ def main():
     feature_cols = [
         "out_degree", "in_degree",
         "version_age", "recency", "is_latest",
-        "cve_count",
+        "cve_count", "max_cvss",
     ]
 
     print("\n=== Feature summary ===")
