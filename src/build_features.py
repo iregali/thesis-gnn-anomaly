@@ -10,9 +10,6 @@ import glob
 import numpy as np
 import pandas as pd
 
-# Fixed reference date = dataset snapshot (April 2026 snapshot)
-REFERENCE_DATE = pd.Timestamp("2026-04-01", tz="UTC")
-
 DATA_DIR = "/home/igalimi1/thesis/data"
 
 
@@ -48,9 +45,15 @@ def compute_features(nodes_df, edges_df):
         nodes_df["UpstreamPublishedAt"], errors="coerce", utc=True
     )
 
-    # version age: days from publish date to snapshot
+    # Reference date = latest publish date present in the snapshot.
+    # This is the true snapshot boundary, derived from the data itself,
+    # ensuring all version ages are non-negative and reproducible.
+    reference_date = nodes_df["published"].max()
+    print(f"Reference date (snapshot boundary): {reference_date}")
+
+    # version age: days from publish date to snapshot boundary
     nodes_df["version_age"] = (
-        REFERENCE_DATE - nodes_df["published"]
+        reference_date - nodes_df["published"]
     ).dt.days
 
     # recency: days since the most recent release of the SAME package
