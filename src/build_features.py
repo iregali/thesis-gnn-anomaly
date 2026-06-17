@@ -67,7 +67,8 @@ def compute_features(nodes_df, edges_df):
 
     # ---- Vulnerability features ----
     nodes_df["cve_count"] = nodes_df["cve_count"].fillna(0)
-    # max_cvss added later via a BigQuery join
+    # max_cvss added via a BigQuery join
+    nodes_df["max_cvss"] = nodes_df["max_cvss"].fillna(0)
 
     # ---- Handle missing temporal values ----
     # impute missing ages/recency with the mean
