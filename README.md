@@ -1,3 +1,37 @@
+# Detecting Anomalous Components in Software Ecosystems via Contrastive Self-Supervised Graph Neural Networks
+
+Master's thesis project (Utrecht University, Artificial Intelligence).
+A self-supervised contrastive GNN framework for detecting anomalous
+(malicious or vulnerable) packages in the PyPI software ecosystem,
+without relying on labelled anomalies during training.
+
+## Overview
+
+Packages in the PyPI ecosystem form a directed dependency graph.
+This project trains a Graph Neural Network with a contrastive
+self-supervised objective to learn structural representations of
+package versions, then applies classical anomaly detectors to the
+learned embeddings to rank packages by anomalousness. The central
+contribution is a novel structure-aware contrastive loss tailored
+to dependency graphs.
+
+## Data
+
+The experimental graph is built from the
+[deps.dev](https://deps.dev) BigQuery public dataset (PyPI,
+April 2026 snapshot). The subgraph used for experiments contains:
+
+- 136,380 nodes (package versions)
+- 496,525 directed dependency edges
+- 39,033 confirmed-vulnerable nodes, 97,347 normal nodes
+
+Each node has three feature groups:
+- **Metadata**: in-degree, out-degree, version age, recency, is-latest
+- **Code-level** (via [GuardDog](https://github.com/DataDog/guarddog)):
+  code execution, network exfiltration, obfuscation, command abuse,
+  sensitive access
+- **Vulnerability** (via OSV): CVE count, maximum CVSS score
+
 ## Setup
 
 ```bash
