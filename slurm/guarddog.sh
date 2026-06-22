@@ -4,7 +4,7 @@
 #SBATCH --partition=rome
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
-#SBATCH --cpus-per-task=64
+#SBATCH --cpus-per-task=32
 #SBATCH --time=08:00:00
 #SBATCH --output=guarddog_%j.log
 
