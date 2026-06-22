@@ -1,5 +1,6 @@
 #!/bin/bash
 #SBATCH --job-name=guarddog
+#SBATCH --account=uusei19045
 #SBATCH --partition=rome
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
