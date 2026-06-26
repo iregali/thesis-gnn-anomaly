@@ -1,3 +1,12 @@
+#!/bin/bash
+#SBATCH --job-name=guarddog
+#SBATCH --cpus-per-task=8
+#SBATCH --time=02:00:00
+#SBATCH --mem=8G
+#SBATCH --output=guarddog.out
+
+mkdir -p results
+
 find ~/thesis/pypi_malregistry -name "*.tar.gz" \
 | xargs -P 8 -I {} bash -c '
   file="{}"
