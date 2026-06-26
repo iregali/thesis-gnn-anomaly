@@ -1,9 +1,10 @@
 #!/bin/bash
-#SBATCH --job-name=guarddog
+#SBATCH --job-name=guarddog_run
 #SBATCH --cpus-per-task=8
 #SBATCH --time=02:00:00
 #SBATCH --mem=8G
-#SBATCH --output=guarddog.out
+#SBATCH --output=guarddog_run.out
+cd $HOME/thesis-gnn-anomaly
 
 mkdir -p results
 
