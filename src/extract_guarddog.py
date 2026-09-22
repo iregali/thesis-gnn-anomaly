@@ -54,7 +54,7 @@ import pandas as pd
 DATA_DIR = os.path.expanduser("~/thesis/data")
 MALREGISTRY_ROOT = os.path.expanduser("~/thesis/pypi_malregistry")
 NUM_WORKERS = int(os.environ.get("SLURM_CPUS_PER_TASK", 8))
-TIMEOUT = 180  # seconds per package
+TIMEOUT = 600  # seconds per package
 
 RULE_GROUPS = {
     "code_execution": ["code-execution", "exec-base64", "silent-process-execution"],
@@ -249,9 +249,9 @@ def main():
     if todo:
         with Pool(NUM_WORKERS) as pool:
             batch = []
-            for i, row in enumerate(pool.imap_unordered(scan_fn, todo, chunksize=10), 1):
+            for i, row in enumerate(pool.imap_unordered(scan_fn, todo, chunksize=1), 1):
                 batch.append(row)
-                if len(batch) >= 200:
+                if len(batch) >= 20:
                     pd.DataFrame(batch).to_csv(args.out, mode="a", header=write_header, index=False)
                     write_header = False
                     batch = []
