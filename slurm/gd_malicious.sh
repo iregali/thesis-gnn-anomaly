@@ -3,8 +3,8 @@
 #SBATCH --partition=rome
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
-#SBATCH --cpus-per-task=64
-#SBATCH --time=12:00:00
+#SBATCH --cpus-per-task=32
+#SBATCH --time=05:00:00
 #SBATCH --output=logs/%x_%j.out
 
 source ~/setup_env.sh

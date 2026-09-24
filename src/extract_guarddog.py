@@ -54,7 +54,7 @@ import pandas as pd
 DATA_DIR = os.path.expanduser("~/thesis/data")
 MALREGISTRY_ROOT = os.path.expanduser("~/thesis/pypi_malregistry")
 NUM_WORKERS = int(os.environ.get("SLURM_CPUS_PER_TASK", 8))
-TIMEOUT = 600  # seconds per package
+TIMEOUT = 120  # seconds per package
 
 RULE_GROUPS = {
     "code_execution": ["code-execution", "exec-base64", "silent-process-execution"],
