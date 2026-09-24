@@ -4,14 +4,25 @@ Preliminary baseline: classical anomaly detectors applied directly
 to engineered package features (no GNN yet).
 Evaluates against known-malicious packages (malregistry).
 
-Reports
+Protocol (train / validation / test)
+  - Normal packages: 50% train, 20% validation, 30% test.
+  - Malicious packages: split BY PACKAGE NAME (all releases of a name stay
+    together): 20% of names for validation, 80% for test. Malware is never
+    used to fit the unsupervised detectors.
+  - Each detector's preprocessing and settings are chosen on VALIDATION,
+    using partial ROC-AUC up to 5% false positives (the region that matters
+    in practice). Results are reported on the untouched TEST set only.
+  - Isolation Forest: averaged over several random seeds (mean +- std),
+    since single runs vary by a few points.
+
+Reports (test set)
   1. ROC-AUC on all malware and on "GuardDog-hard" malware
      (malware GuardDog did not flag, including failed scans)
   2. Operating points: detection rate (TPR) at 1% and 5% false positives,
      and at GuardDog's own false-positive rate (like-for-like comparison)
   3. Precision at realistic base rates (1 in 200, 1 in 1000 uploads),
      at GuardDog's FPR and at 1% FPR
-  4. Single-feature separability ranking
+  4. Single-feature separability ranking (descriptive, all packages)
 Results are also saved as CSV in RESULTS_DIR.
 """
 
@@ -25,7 +36,6 @@ from sklearn.ensemble import IsolationForest, RandomForestClassifier
 from sklearn.neighbors import LocalOutlierFactor
 from sklearn.svm import OneClassSVM
 from sklearn.metrics import roc_auc_score
-from sklearn.model_selection import GroupKFold
 
 DATA_DIR = "/home/igalimi1/thesis/data"
 RESULTS_DIR = "/home/igalimi1/thesis/results"
@@ -33,13 +43,26 @@ RESULTS_DIR = "/home/igalimi1/thesis/results"
 # identifiers and bookkeeping columns, not features
 ID_COLS = ["Name", "Version", "path", "archive_type", "read_failed", "error", "truncated"]
 
-# redundant features: author_repo_defined is 1 exactly when a repo link
-# exists, so it duplicates has_source_repo
+# redundant: author_repo_defined is 1 exactly when a repo link exists
 DROP_COLS = ["author_repo_defined"]
 
 # GuardDog rule groups (source-code rules only)
 GD_GROUPS = ["code_execution", "network_exfiltration", "obfuscation",
              "command_abuse", "sensitive_access"]
+
+SPLIT_SEED = 42
+NORMAL_SPLIT = (0.5, 0.2, 0.3)   # train, validation, test
+MALWARE_VAL_SHARE = 0.2          # share of malicious package NAMES used for validation
+SELECT_MAX_FPR = 0.05            # model selection: partial ROC-AUC up to this FPR
+IF_SEEDS = [0, 1, 2, 3, 4]
+
+# Candidate settings, chosen per detector on the validation set.
+# "scale_all": standardize every column (rare 0/1 flags get weighted by rarity)
+# "binary_raw": leave 0/1 flags as they are, standardize continuous columns only
+PREPROCESSING = ["scale_all", "binary_raw"]
+OCSVM_NU = [0.01, 0.05, 0.1]
+OCSVM_GAMMA = [0.1, 1.0, 10.0]   # multiplied by 1 / n_features
+LOF_NEIGHBORS = [10, 35, 100]
 
 FPR_TARGETS = [0.01, 0.05]
 BASE_RATES = [200, 1000]  # "1 in N uploads is malicious"
@@ -62,6 +85,21 @@ def load(cls, label):
     return df
 
 
+def preprocess(X, fit_idx, mode):
+    """log1p on non-negative continuous columns, then standardize
+    (statistics from the normal TRAIN rows only)."""
+    X = X.copy()
+    if mode == "scale_all":
+        cont = np.ones(X.shape[1], dtype=bool)
+    else:  # binary_raw
+        cont = ~np.all(np.isin(X, [0, 1]), axis=0)
+    nonneg = cont & (X.min(axis=0) >= 0)
+    X[:, nonneg] = np.log1p(X[:, nonneg])
+    scaler = StandardScaler().fit(X[fit_idx][:, cont])
+    X[:, cont] = scaler.transform(X[:, cont])
+    return X
+
+
 def tpr_at_fpr(scores, y, fpr):
     """Detection rate when the threshold lets `fpr` of normal packages through."""
     threshold = np.quantile(scores[y == 0], 1 - fpr)
@@ -71,11 +109,36 @@ def tpr_at_fpr(scores, y, fpr):
 def precision_at(tpr, fpr, n):
     """Share of alerts that are real if 1 in n uploads is malicious."""
     p = 1 / n
-    return tpr * p / (tpr * p + fpr * (1 - p)) if (tpr * p + fpr * (1 - p)) else float("nan")
+    denom = tpr * p + fpr * (1 - p)
+    return tpr * p / denom if denom else float("nan")
+
+
+def evaluate(name, s, y, hard, gd_tpr, gd_fpr):
+    """All test metrics for one method's scores `s`."""
+    keep_hard = (y == 0) | hard
+    row = {"method": name,
+           "auc_all": roc_auc_score(y, s),
+           "auc_hard": roc_auc_score(y[keep_hard], s[keep_hard])}
+    if name == "GuardDog rule":  # a fixed rule has one operating point
+        tpr, fpr, tpr_hard = gd_tpr, gd_fpr, 0.0
+        tpr1 = fpr1 = np.nan
+        for f in FPR_TARGETS:
+            row[f"tpr@fpr{int(f * 100)}%"] = np.nan
+    else:
+        for f in FPR_TARGETS:
+            row[f"tpr@fpr{int(f * 100)}%"] = tpr_at_fpr(s, y, f)[0]
+        tpr, fpr = tpr_at_fpr(s, y, gd_fpr)
+        tpr_hard = tpr_at_fpr(s[keep_hard], y[keep_hard], gd_fpr)[0]
+        tpr1, fpr1 = tpr_at_fpr(s, y, 0.01)
+    row["tpr@gd_fpr"], row["fpr@gd_fpr"], row["tpr_hard@gd_fpr"] = tpr, fpr, tpr_hard
+    for n in BASE_RATES:
+        row[f"precision@1:{n}"] = precision_at(tpr, fpr, n)
+        row[f"precision_fpr1%@1:{n}"] = precision_at(tpr1, fpr1, n)
+    return row
 
 
 def main():
-    # load features
+    # ---- Load features ----
     feats = pd.concat([load("malicious", 1), load("normal", 0)], ignore_index=True)
     y_all = feats["label"].values
     print(f"Positives: {y_all.sum()}, Normals: {(y_all == 0).sum()}")
@@ -96,109 +159,114 @@ def main():
         "static + GuardDog features": static_cols + gd_cols,
     }
 
-    # Train on NORMAL packages only. The dataset is ~70% malware, unlike
-    # reality, so fitting on everything would teach the detectors that
-    # malware is normal. Hold out 40% of normal packages for evaluation.
-    rng = np.random.RandomState(42)
+    # ---- Split: train / validation / test ----
+    rng = np.random.RandomState(SPLIT_SEED)
     normal_idx = np.where(y_all == 0)[0]
-    test_normal = rng.choice(normal_idx, size=int(0.4 * len(normal_idx)), replace=False)
-    train_idx = np.setdiff1d(normal_idx, test_normal)
-    eval_idx = np.concatenate([test_normal, np.where(y_all == 1)[0]])
-    y = y_all[eval_idx]
+    rng.shuffle(normal_idx)
+    n_tr = int(NORMAL_SPLIT[0] * len(normal_idx))
+    n_va = int(NORMAL_SPLIT[1] * len(normal_idx))
+    train_idx = normal_idx[:n_tr]
+    val_normal = normal_idx[n_tr:n_tr + n_va]
+    test_normal = normal_idx[n_tr + n_va:]
 
-    # GuardDog-hard: malware that GuardDog did not flag (incl. failed scans)
-    hard = (y == 1) & (gd_flagged[eval_idx] == 0)
-    print(f"Train: {len(train_idx)} normal | Eval: {(y == 0).sum()} normal + "
-          f"{(y == 1).sum()} malicious ({hard.sum()} GuardDog-hard)")
+    # Malware split by package name, so releases of one package stay together.
+    # (Campaigns that use several different names can still span both sides.)
+    names = feats["Name"].map(lambda n: re.sub(r"[-_.]+", "-", str(n)).lower()).values
+    mal_names = np.unique(names[y_all == 1])
+    rng.shuffle(mal_names)
+    val_names = set(mal_names[:int(MALWARE_VAL_SHARE * len(mal_names))])
+    is_val_name = np.array([n in val_names for n in names])
+    val_mal = np.where((y_all == 1) & is_val_name)[0]
+    test_mal = np.where((y_all == 1) & ~is_val_name)[0]
+
+    val_idx = np.concatenate([val_normal, val_mal])
+    test_idx = np.concatenate([test_normal, test_mal])
+    y_val, y = y_all[val_idx], y_all[test_idx]
+    hard = (y == 1) & (gd_flagged[test_idx] == 0)
+    print(f"Train: {len(train_idx)} normal | Validation: {len(val_normal)} normal + "
+          f"{len(val_mal)} malicious | Test: {len(test_normal)} normal + {len(test_mal)} "
+          f"malicious ({hard.sum()} GuardDog-hard)")
+
+    def select_score(s_val):
+        return roc_auc_score(y_val, s_val, max_fpr=SELECT_MAX_FPR)
 
     # ---- GuardDog rule (baseline) ----
-    gd_eval = gd_flagged[eval_idx]
-    gd_tpr, gd_fpr = gd_eval[y == 1].mean(), gd_eval[y == 0].mean()
-    print(f"\nGuardDog flags {gd_tpr:.1%} of malware and {gd_fpr:.1%} of normal packages")
-
-    scores = {"GuardDog rule": feats["code_issue_count"].values[eval_idx] + gd_eval}
+    gd_test = gd_flagged[test_idx]
+    gd_tpr, gd_fpr = gd_test[y == 1].mean(), gd_test[y == 0].mean()
+    print(f"\nGuardDog flags {gd_tpr:.1%} of test malware and {gd_fpr:.1%} of test normal packages")
+    rows = [evaluate("GuardDog rule", feats["code_issue_count"].values[test_idx] + gd_test,
+                     y, hard, gd_tpr, gd_fpr)]
+    chosen = []
 
     for set_name, cols in feature_sets.items():
-        X = feats[cols].fillna(0).values.astype(float)
+        X_raw = feats[cols].fillna(0).values.astype(float)
+        X_prep = {mode: preprocess(X_raw, train_idx, mode) for mode in PREPROCESSING}
+        n_feat = X_raw.shape[1]
 
-        # Preprocessing for the distance-based detectors (LOF, OCSVM):
-        # - binary 0/1 flags are left as they are. Standardizing a rare flag
-        #   divides by a tiny spread and blows a single 1 up to ~+8, so one
-        #   flag would dominate every distance.
-        # - continuous columns: log1p if non-negative (tames heavy tails, e.g.
-        #   a 42,000-character line), then standardize on the normal train split
-        binary = np.all(np.isin(X, [0, 1]), axis=0)
-        cont = ~binary
-        nonneg = cont & (X.min(axis=0) >= 0)
-        X[:, nonneg] = np.log1p(X[:, nonneg])
-        scaler = StandardScaler().fit(X[train_idx][:, cont])
-        X[:, cont] = scaler.transform(X[:, cont])
-        X_train, X_eval = X[train_idx], X[eval_idx]
-        print(f"{set_name}: {binary.sum()} binary columns kept as 0/1, "
-              f"{cont.sum()} continuous columns scaled")
-
-        # ---- Isolation Forest ----
-        iso = IsolationForest(random_state=42, n_estimators=100)
-        iso.fit(X_train)
-        scores[f"IsolationForest ({set_name})"] = -iso.decision_function(X_eval)
+        # ---- Isolation Forest (no scaling needed; averaged over seeds) ----
+        seed_rows = []
+        for seed in IF_SEEDS:
+            iso = IsolationForest(n_estimators=300, random_state=seed, n_jobs=2)
+            iso.fit(X_raw[train_idx])
+            seed_rows.append(evaluate(f"IsolationForest ({set_name})",
+                                      -iso.decision_function(X_raw[test_idx]),
+                                      y, hard, gd_tpr, gd_fpr))
+        seed_df = pd.DataFrame(seed_rows)
+        row = seed_df.drop(columns="method").mean().to_dict()
+        row["method"] = f"IsolationForest ({set_name})"
+        row["auc_all_std"] = seed_df["auc_all"].std()
+        rows.append(row)
+        chosen.append({"method": row["method"], "setting": f"300 trees, {len(IF_SEEDS)} seeds"})
 
         # ---- Local Outlier Factor (novelty mode: learns normal, scores new) ----
-        lof = LocalOutlierFactor(n_neighbors=35, novelty=True)
-        lof.fit(X_train)
-        scores[f"LOF ({set_name})"] = -lof.decision_function(X_eval)
+        best = None
+        for mode in PREPROCESSING:
+            for k in LOF_NEIGHBORS:
+                lof = LocalOutlierFactor(n_neighbors=k, novelty=True)
+                lof.fit(X_prep[mode][train_idx])
+                score = select_score(-lof.decision_function(X_prep[mode][val_idx]))
+                if best is None or score > best[0]:
+                    best = (score, f"{mode}, n_neighbors={k}", lof, mode)
+        name = f"LOF ({set_name})"
+        rows.append(evaluate(name, -best[2].decision_function(X_prep[best[3]][test_idx]),
+                             y, hard, gd_tpr, gd_fpr))
+        chosen.append({"method": name, "setting": best[1], "val_pauc": best[0]})
 
-        # ---- One-Class SVM (train set is small now, no subsampling needed) ----
-        ocsvm = OneClassSVM(kernel="rbf", gamma="scale", nu=0.05)
-        ocsvm.fit(X_train)
-        scores[f"OneClassSVM ({set_name})"] = -ocsvm.decision_function(X_eval)
+        # ---- One-Class SVM ----
+        best = None
+        for mode in PREPROCESSING:
+            for nu in OCSVM_NU:
+                for g in OCSVM_GAMMA:
+                    ocsvm = OneClassSVM(kernel="rbf", gamma=g / n_feat, nu=nu)
+                    ocsvm.fit(X_prep[mode][train_idx])
+                    score = select_score(-ocsvm.decision_function(X_prep[mode][val_idx]))
+                    if best is None or score > best[0]:
+                        best = (score, f"{mode}, nu={nu}, gamma={g}/n_features", ocsvm, mode)
+        name = f"OneClassSVM ({set_name})"
+        rows.append(evaluate(name, -best[2].decision_function(X_prep[best[3]][test_idx]),
+                             y, hard, gd_tpr, gd_fpr))
+        chosen.append({"method": name, "setting": best[1], "val_pauc": best[0]})
 
     # ---- Random Forest (supervised REFERENCE, uses labels) ----
     # Shows how separable the data is when labels are available: an upper
-    # reference, not a competitor to the self-supervised method.
-    # 5-fold cross-validation, all releases of a package name in the same fold.
-    # Still optimistic: campaigns under different names can span folds.
-    X = feats[static_cols + gd_cols].fillna(0).values
-    groups = feats["Name"].map(lambda n: re.sub(r"[-_.]+", "-", str(n)).lower())
-    oof = np.zeros(len(feats))
-    for tr, te in GroupKFold(n_splits=5).split(X, y_all, groups):
-        rf = RandomForestClassifier(n_estimators=300, class_weight="balanced",
-                                    random_state=42, n_jobs=2)
-        rf.fit(X[tr], y_all[tr])
-        oof[te] = rf.predict_proba(X[te])[:, 1]
-    scores["RandomForest (supervised reference)"] = oof[eval_idx]
+    # reference, not a competitor to the self-supervised method. Trained on
+    # everything outside the test set (normal train + validation, malware
+    # validation names), evaluated on the same test set as the detectors.
+    cols = static_cols + gd_cols
+    fit_idx = np.concatenate([train_idx, val_idx])
+    rf = RandomForestClassifier(n_estimators=300, class_weight="balanced",
+                                random_state=SPLIT_SEED, n_jobs=2)
+    rf.fit(feats[cols].values[fit_idx], y_all[fit_idx])
+    rows.append(evaluate("RandomForest (supervised reference)",
+                         rf.predict_proba(feats[cols].values[test_idx])[:, 1],
+                         y, hard, gd_tpr, gd_fpr))
+    chosen.append({"method": "RandomForest (supervised reference)",
+                   "setting": "300 trees, class_weight=balanced"})
 
-    # ---- Metrics ----
-    keep_hard = (y == 0) | hard
-    rows = []
-    for name, s in scores.items():
-        row = {"method": name,
-               "auc_all": roc_auc_score(y, s),
-               "auc_hard": roc_auc_score(y[keep_hard], s[keep_hard])}
-        if name == "GuardDog rule":  # a fixed rule has one operating point
-            tpr, fpr = gd_tpr, gd_fpr
-            tpr_hard = 0.0  # by definition it flags none of the hard set
-            for f in FPR_TARGETS:
-                row[f"tpr@fpr{int(f * 100)}%"] = np.nan
-        else:
-            for f in FPR_TARGETS:
-                row[f"tpr@fpr{int(f * 100)}%"] = tpr_at_fpr(s, y, f)[0]
-            tpr, fpr = tpr_at_fpr(s, y, gd_fpr)
-            tpr_hard = tpr_at_fpr(s[keep_hard], y[keep_hard], gd_fpr)[0]
-        row["tpr@gd_fpr"], row["fpr@gd_fpr"], row["tpr_hard@gd_fpr"] = tpr, fpr, tpr_hard
-        for n in BASE_RATES:
-            row[f"precision@1:{n}"] = precision_at(tpr, fpr, n)
-        # precision at the low-false-alarm operating point (1% FPR)
-        if name == "GuardDog rule":
-            for n in BASE_RATES:
-                row[f"precision_fpr1%@1:{n}"] = np.nan
-        else:
-            tpr1, fpr1 = tpr_at_fpr(s, y, 0.01)
-            for n in BASE_RATES:
-                row[f"precision_fpr1%@1:{n}"] = precision_at(tpr1, fpr1, n)
-        rows.append(row)
     results = pd.DataFrame(rows)
+    chosen = pd.DataFrame(chosen)
 
-    # ---- Single-feature separability (all packages) ----
+    # ---- Single-feature separability (descriptive, all packages) ----
     feat_rows = []
     for col in static_cols + gd_cols:
         x = feats[col].fillna(0)
@@ -212,19 +280,25 @@ def main():
     feat_auc = pd.DataFrame(feat_rows).sort_values("auc", ascending=False)
 
     # ---- Report ----
-    print("\n=== Baseline ROC-AUC ===")
+    print(f"\n=== Settings chosen on validation (partial ROC-AUC, FPR <= {SELECT_MAX_FPR:.0%}) ===")
+    for _, r in chosen.iterrows():
+        extra = f"   (val pAUC {r['val_pauc']:.3f})" if pd.notna(r.get("val_pauc")) else ""
+        print(f"{r['method']:48s}{r['setting']}{extra}")
+
+    print("\n=== Test ROC-AUC ===")
     print(f"{'':48s}{'all malware':>12s}{'GuardDog-hard':>15s}")
     for _, r in results.iterrows():
-        print(f"{r['method']:48s}{r['auc_all']:12.4f}{r['auc_hard']:15.4f}")
+        std = f" +- {r['auc_all_std']:.3f}" if pd.notna(r.get("auc_all_std")) else ""
+        print(f"{r['method']:48s}{r['auc_all']:12.4f}{r['auc_hard']:15.4f}{std}")
 
-    print(f"\n=== Operating points (GuardDog FPR = {gd_fpr:.1%}) ===")
+    print(f"\n=== Test operating points (GuardDog FPR = {gd_fpr:.1%}) ===")
     header = ["tpr@fpr1%", "tpr@fpr5%", "tpr@gd_fpr", "tpr_hard@gd_fpr"]
     print(f"{'':48s}" + "".join(f"{h:>17s}" for h in header))
     for _, r in results.iterrows():
         print(f"{r['method']:48s}" + "".join(
             f"{'-':>17s}" if pd.isna(r[h]) else f"{r[h]:17.3f}" for h in header))
 
-    print("\n=== Precision at realistic base rates ===")
+    print("\n=== Test precision at realistic base rates ===")
     print("(share of alerts that are real malware, if 1 in N uploads is malicious)")
     header2 = ["precision@1:200", "precision@1:1000", "precision_fpr1%@1:200",
                "precision_fpr1%@1:1000"]
@@ -234,11 +308,12 @@ def main():
         print(f"{r['method']:48s}" + "".join(
             f"{'-':>17s}" if pd.isna(r[h]) else f"{r[h]:17.3f}" for h in header2))
 
-    print("\n=== Top 15 single features (ROC-AUC, direction-free) ===")
+    print("\n=== Top 15 single features (ROC-AUC, direction-free, all packages) ===")
     print(feat_auc.head(15).round(4).to_string(index=False))
 
     os.makedirs(RESULTS_DIR, exist_ok=True)
     results.to_csv(f"{RESULTS_DIR}/baseline_results.csv", index=False)
+    chosen.to_csv(f"{RESULTS_DIR}/baseline_chosen_settings.csv", index=False)
     feat_auc.to_csv(f"{RESULTS_DIR}/feature_auc.csv", index=False)
     print(f"\nSaved to {RESULTS_DIR}/")
 
