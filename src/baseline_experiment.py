@@ -8,9 +8,10 @@ Reports
   1. ROC-AUC on all malware and on "GuardDog-hard" malware
      (malware GuardDog did not flag, including failed scans)
   2. Operating points: detection rate (TPR) at 1% and 5% false positives,
-     and at GuardDog's own false-positive rate (like-for-like comparison),
-     plus precision at realistic base rates (1 in 200, 1 in 1000 uploads)
-  3. Single-feature separability ranking
+     and at GuardDog's own false-positive rate (like-for-like comparison)
+  3. Precision at realistic base rates (1 in 200, 1 in 1000 uploads),
+     at GuardDog's FPR and at 1% FPR
+  4. Single-feature separability ranking
 Results are also saved as CSV in RESULTS_DIR.
 """
 
@@ -31,6 +32,10 @@ RESULTS_DIR = "/home/igalimi1/thesis/results"
 
 # identifiers and bookkeeping columns, not features
 ID_COLS = ["Name", "Version", "path", "archive_type", "read_failed", "error", "truncated"]
+
+# redundant features: author_repo_defined is 1 exactly when a repo link
+# exists, so it duplicates has_source_repo
+DROP_COLS = ["author_repo_defined"]
 
 # GuardDog rule groups (source-code rules only)
 GD_GROUPS = ["code_execution", "network_exfiltration", "obfuscation",
@@ -85,7 +90,7 @@ def main():
     gd_flagged = (feats[GD_GROUPS].sum(axis=1) > 0).astype(int).values
 
     static_cols = [c for c in feats.columns
-                   if c not in ID_COLS + gd_cols + ["scan_failed", "label"]]
+                   if c not in ID_COLS + DROP_COLS + gd_cols + ["scan_failed", "label"]]
     feature_sets = {
         "static features": static_cols,
         "static + GuardDog features": static_cols + gd_cols,
@@ -116,12 +121,21 @@ def main():
     for set_name, cols in feature_sets.items():
         X = feats[cols].fillna(0).values.astype(float)
 
-        # log1p on non-negative columns (tames heavy tails, e.g. a
-        # 42,000-character line), then standardize on the normal train split
-        nonneg = X.min(axis=0) >= 0
+        # Preprocessing for the distance-based detectors (LOF, OCSVM):
+        # - binary 0/1 flags are left as they are. Standardizing a rare flag
+        #   divides by a tiny spread and blows a single 1 up to ~+8, so one
+        #   flag would dominate every distance.
+        # - continuous columns: log1p if non-negative (tames heavy tails, e.g.
+        #   a 42,000-character line), then standardize on the normal train split
+        binary = np.all(np.isin(X, [0, 1]), axis=0)
+        cont = ~binary
+        nonneg = cont & (X.min(axis=0) >= 0)
         X[:, nonneg] = np.log1p(X[:, nonneg])
-        scaler = StandardScaler().fit(X[train_idx])
-        X_train, X_eval = scaler.transform(X[train_idx]), scaler.transform(X[eval_idx])
+        scaler = StandardScaler().fit(X[train_idx][:, cont])
+        X[:, cont] = scaler.transform(X[:, cont])
+        X_train, X_eval = X[train_idx], X[eval_idx]
+        print(f"{set_name}: {binary.sum()} binary columns kept as 0/1, "
+              f"{cont.sum()} continuous columns scaled")
 
         # ---- Isolation Forest ----
         iso = IsolationForest(random_state=42, n_estimators=100)
@@ -173,6 +187,14 @@ def main():
         row["tpr@gd_fpr"], row["fpr@gd_fpr"], row["tpr_hard@gd_fpr"] = tpr, fpr, tpr_hard
         for n in BASE_RATES:
             row[f"precision@1:{n}"] = precision_at(tpr, fpr, n)
+        # precision at the low-false-alarm operating point (1% FPR)
+        if name == "GuardDog rule":
+            for n in BASE_RATES:
+                row[f"precision_fpr1%@1:{n}"] = np.nan
+        else:
+            tpr1, fpr1 = tpr_at_fpr(s, y, 0.01)
+            for n in BASE_RATES:
+                row[f"precision_fpr1%@1:{n}"] = precision_at(tpr1, fpr1, n)
         rows.append(row)
     results = pd.DataFrame(rows)
 
@@ -196,12 +218,21 @@ def main():
         print(f"{r['method']:48s}{r['auc_all']:12.4f}{r['auc_hard']:15.4f}")
 
     print(f"\n=== Operating points (GuardDog FPR = {gd_fpr:.1%}) ===")
-    header = ["tpr@fpr1%", "tpr@fpr5%", "tpr@gd_fpr", "tpr_hard@gd_fpr",
-              "precision@1:200", "precision@1:1000"]
+    header = ["tpr@fpr1%", "tpr@fpr5%", "tpr@gd_fpr", "tpr_hard@gd_fpr"]
     print(f"{'':48s}" + "".join(f"{h:>17s}" for h in header))
     for _, r in results.iterrows():
         print(f"{r['method']:48s}" + "".join(
             f"{'-':>17s}" if pd.isna(r[h]) else f"{r[h]:17.3f}" for h in header))
+
+    print("\n=== Precision at realistic base rates ===")
+    print("(share of alerts that are real malware, if 1 in N uploads is malicious)")
+    header2 = ["precision@1:200", "precision@1:1000", "precision_fpr1%@1:200",
+               "precision_fpr1%@1:1000"]
+    labels2 = ["@GD-FPR 1:200", "@GD-FPR 1:1000", "@1%FPR 1:200", "@1%FPR 1:1000"]
+    print(f"{'':48s}" + "".join(f"{h:>17s}" for h in labels2))
+    for _, r in results.iterrows():
+        print(f"{r['method']:48s}" + "".join(
+            f"{'-':>17s}" if pd.isna(r[h]) else f"{r[h]:17.3f}" for h in header2))
 
     print("\n=== Top 15 single features (ROC-AUC, direction-free) ===")
     print(feat_auc.head(15).round(4).to_string(index=False))
