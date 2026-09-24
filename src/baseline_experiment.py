@@ -5,10 +5,12 @@ to engineered package features (no GNN yet).
 Evaluates against known-malicious packages (malregistry).
 
 Protocol (train / validation / test)
-  - Normal packages: 50% train, 20% validation, 30% test.
-  - Malicious packages: split BY PACKAGE NAME (all releases of a name stay
-    together): 20% of names for validation, 80% for test. Malware is never
-    used to fit the unsupervised detectors.
+  - The split is read from DATA_DIR/splits.csv, created once by
+    make_splits.py and shared by all methods (baselines, GNN).
+  - Normal packages: ~50% train, ~20% validation, ~30% test.
+  - Malicious packages: by package name (all releases of a name stay
+    together): ~20% validation, ~80% test. Malware is never used to fit
+    the unsupervised detectors.
   - Each detector's preprocessing and settings are chosen on VALIDATION,
     using partial ROC-AUC up to 5% false positives (the region that matters
     in practice). Results are reported on the untouched TEST set only.
@@ -27,7 +29,6 @@ Results are also saved as CSV in RESULTS_DIR.
 """
 
 import os
-import re
 
 import numpy as np
 import pandas as pd
@@ -51,8 +52,6 @@ GD_GROUPS = ["code_execution", "network_exfiltration", "obfuscation",
              "command_abuse", "sensitive_access"]
 
 SPLIT_SEED = 42
-NORMAL_SPLIT = (0.5, 0.2, 0.3)   # train, validation, test
-MALWARE_VAL_SHARE = 0.2          # share of malicious package NAMES used for validation
 SELECT_MAX_FPR = 0.05            # model selection: partial ROC-AUC up to this FPR
 IF_SEEDS = [0, 1, 2, 3, 4]
 
@@ -159,32 +158,21 @@ def main():
         "static + GuardDog features": static_cols + gd_cols,
     }
 
-    # ---- Split: train / validation / test ----
-    rng = np.random.RandomState(SPLIT_SEED)
-    normal_idx = np.where(y_all == 0)[0]
-    rng.shuffle(normal_idx)
-    n_tr = int(NORMAL_SPLIT[0] * len(normal_idx))
-    n_va = int(NORMAL_SPLIT[1] * len(normal_idx))
-    train_idx = normal_idx[:n_tr]
-    val_normal = normal_idx[n_tr:n_tr + n_va]
-    test_normal = normal_idx[n_tr + n_va:]
-
-    # Malware split by package name, so releases of one package stay together.
-    # (Campaigns that use several different names can still span both sides.)
-    names = feats["Name"].map(lambda n: re.sub(r"[-_.]+", "-", str(n)).lower()).values
-    mal_names = np.unique(names[y_all == 1])
-    rng.shuffle(mal_names)
-    val_names = set(mal_names[:int(MALWARE_VAL_SHARE * len(mal_names))])
-    is_val_name = np.array([n in val_names for n in names])
-    val_mal = np.where((y_all == 1) & is_val_name)[0]
-    test_mal = np.where((y_all == 1) & ~is_val_name)[0]
-
-    val_idx = np.concatenate([val_normal, val_mal])
-    test_idx = np.concatenate([test_normal, test_mal])
+    # ---- Split: fixed assignment from splits.csv (created by make_splits.py) ----
+    # All methods (baselines, GNN) use this same file, so they are evaluated
+    # on exactly the same packages.
+    splits = pd.read_csv(f"{DATA_DIR}/splits.csv", dtype={"Version": str})
+    split = feats["path"].map(dict(zip(splits["path"], splits["split"])))
+    if split.isna().any():
+        raise SystemExit(f"{int(split.isna().sum())} packages are missing from splits.csv: "
+                         "run src/make_splits.py first")
+    train_idx = np.where((split == "train") & (y_all == 0))[0]
+    val_idx = np.where(split == "val")[0]
+    test_idx = np.where(split == "test")[0]
     y_val, y = y_all[val_idx], y_all[test_idx]
     hard = (y == 1) & (gd_flagged[test_idx] == 0)
-    print(f"Train: {len(train_idx)} normal | Validation: {len(val_normal)} normal + "
-          f"{len(val_mal)} malicious | Test: {len(test_normal)} normal + {len(test_mal)} "
+    print(f"Train: {len(train_idx)} normal | Validation: {(y_val == 0).sum()} normal + "
+          f"{(y_val == 1).sum()} malicious | Test: {(y == 0).sum()} normal + {(y == 1).sum()} "
           f"malicious ({hard.sum()} GuardDog-hard)")
 
     def select_score(s_val):
