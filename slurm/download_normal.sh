@@ -7,4 +7,4 @@
 source ~/setup_env.sh
 cd ~/thesis/thesis-gnn-anomaly
 source venv/bin/activate
-python src/sample_normal.py --n 5000 --out-root ~/thesis/data/normal_archives
+python src/sample_normal.py --n 15000 --out-root ~/thesis/data/normal_archives
