@@ -233,7 +233,7 @@ def main():
         prev = pd.read_csv(manifest, dtype=str, keep_default_na=False)
         seen = set(prev["Name"])
         ok = prev[prev["status"] == "ok"]
-        filled = Counter(ok["year"].astype(int))
+        filled = Counter(ok["year"].astype(float).astype(int))  # stored as e.g. "2025.0"
     todo = [p for p in order if p not in seen]
     print(f"[info] projects: {len(projects)} | already inspected: {len(seen)} | "
           f"filled so far: {dict(filled)}", flush=True)
