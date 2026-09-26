@@ -3,7 +3,7 @@ make_campaigns.py
 Groups malicious packages into campaigns by payload identity, and saves the
 result to DATA_DIR/campaigns.csv.
 
-Method (step 1: exact match after normalization)
+Method (exact match after normalization, plus name grouping)
   - Each archive is read in memory, nothing is executed (same reader as the
     static feature extractor).
   - All .py files are used, not only setup.py: many packages share template
@@ -13,15 +13,22 @@ Method (step 1: exact match after normalization)
       * file paths made relative to the package root (top folder removed)
       * the package's own name (all spelling variants) and version replaced
         by placeholders, in paths and in code
+      * long encoded string literals (base64 / hex, >= 200 characters)
+        replaced by <BLOB>: many campaigns ship the same wrapper code with a
+        regenerated encoded payload per upload
       * all whitespace removed
   - Fingerprint = SHA-256 of the sorted (path, normalized code) pairs.
-    Packages with the same fingerprint form one campaign.
+  - Campaigns = groups of archives connected by EITHER
+      A. the same package name (all releases of a name), OR
+      B. the same fingerprint (same normalized code under any name).
   - Packages without .py files, or unreadable archives, get their own
     campaign of size 1 (they are not evidence of shared code).
 
-Known limitation: attackers who randomize every copy (different encoding
-keys, shuffled obfuscation) end up as separate campaigns. If the manual
-check shows many obvious copies split apart, add near-duplicate matching.
+Known limitations:
+  - Different actors copying the same public template merge into one
+    campaign (they share tooling, which is what a detector sees).
+  - Copies that change the wrapper code itself (not just the blob) under
+    different names stay apart; near-duplicate matching would be the next step.
 
 Campaign labels are for data selection, splitting and analysis ONLY.
 Never use them as a model feature or to build graph edges.
@@ -58,6 +65,13 @@ def name_variants(name):
     return sorted((v for v in variants if len(v) >= 2), key=len, reverse=True)
 
 
+BLOB_RE = re.compile(r"""(['"])(?:[A-Za-z0-9+/=]{200,}|[0-9a-fA-F]{200,})\1""")
+
+
+def pep503(name):
+    return re.sub(r"[-_.]+", "-", str(name)).lower()
+
+
 def fingerprint(item):
     """Return (name, version, path, fingerprint, n_py_files) for one archive."""
     name, version, path = item
@@ -74,6 +88,7 @@ def fingerprint(item):
     version_re = re.compile(re.escape(str(version))) if str(version) not in ("", "unknown") else None
 
     def normalize(text):
+        text = BLOB_RE.sub("'<BLOB>'", text)
         for p in patterns:
             text = p.sub("<NAME>", text)
         if version_re:
@@ -109,12 +124,37 @@ def main():
         rows = pool.map(fingerprint, items, chunksize=16)
 
     df = pd.DataFrame(rows, columns=["Name", "Version", "path", "fingerprint", "n_py_files"])
-    sizes = df["fingerprint"].map(df["fingerprint"].value_counts())
-    df["campaign_size"] = sizes
-    # stable, readable id: short hash; singletons without code keep their own id
-    df["campaign_id"] = "c_" + df["fingerprint"].map(
-        lambda f: hashlib.sha256(f.encode()).hexdigest()[:10])
+    n_exact = df["fingerprint"].nunique()
+
+    # Union-find over archives: rule A (same name) + rule B (same fingerprint)
+    parent = list(range(len(df)))
+
+    def find(i):
+        while parent[i] != i:
+            parent[i] = parent[parent[i]]
+            i = parent[i]
+        return i
+
+    def union_groups(keys):
+        first = {}
+        for i, k in enumerate(keys):
+            if k in first:
+                parent[find(i)] = find(first[k])
+            else:
+                first[k] = i
+
+    union_groups(df["Name"].map(pep503))  # rule A
+    after_a = len({find(i) for i in range(len(df))})
+    union_groups(df["fingerprint"])        # rule B
+    roots = [find(i) for i in range(len(df))]
+
+    # stable, readable id: hash of the component's smallest path
+    comp_key = pd.Series(df["path"].values).groupby(roots).transform("min")
+    df["campaign_id"] = "c_" + comp_key.map(lambda k: hashlib.sha256(k.encode()).hexdigest()[:10]).values
+    df["campaign_size"] = df["campaign_id"].map(df["campaign_id"].value_counts())
     df.to_csv(out, index=False)
+    print(f"[info] exact code (with <BLOB>) alone: {n_exact} groups | "
+          f"same name alone: {after_a} groups | combined: {df['campaign_id'].nunique()} campaigns")
 
     # ---- Summary ----
     campaigns = df.groupby("campaign_id").agg(size=("path", "size"),
