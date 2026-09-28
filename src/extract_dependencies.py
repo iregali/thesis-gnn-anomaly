@@ -310,8 +310,8 @@ def extract_one(item):
         status = "found"
     elif dynamic:
         status = "dynamic"
-    elif sources_found:
-        status = "none_declared"
+    elif files:
+        status = "none_declared"      # declaration files exist, but declare nothing
     else:
         status = "no_declaration_files"
 
