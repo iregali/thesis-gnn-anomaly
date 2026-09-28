@@ -319,6 +319,7 @@ def extract_one(item):
                "n_core": len(core), "n_optional": len(opt),
                "sources_found": ";".join(sorted(set(sources_found))),
                "status": status, "error": ""}
+    summary["files_present"] = ";".join(sorted({os.path.basename(f) for f in files}))
     edges = [{"Name": name, "Version": str(version), "path": path, "dep": d,
               "optional": 0, "sources": ";".join(sorted(s))} for d, s in sorted(core.items())]
     edges += [{"Name": name, "Version": str(version), "path": path, "dep": d,
@@ -358,6 +359,8 @@ def main():
           f"mean {ok['n_core'].mean():.1f}, max {ok['n_core'].max()}")
     src_counts = Counter(s for v in ok["sources_found"] if v for s in v.split(";"))
     print("declaration sources found (packages):", dict(src_counts.most_common()))
+    present = Counter(s for v in ok["files_present"] if v for s in v.split(";"))
+    print("declaration files present (packages):", dict(present.most_common()))
     core_edges = edges[edges["optional"] == 0]
     print(f"\ncore edges: {len(core_edges)} | optional edges: {int(edges['optional'].sum())} | "
           f"distinct core targets: {core_edges['dep'].nunique()}")
