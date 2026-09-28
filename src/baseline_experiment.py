@@ -7,9 +7,9 @@ Evaluates against known-malicious packages (malregistry).
 Protocol (train / validation / test)
   - The split is read from DATA_DIR/splits.csv, created once by
     make_splits.py and shared by all methods (baselines, GNN).
-  - Normal packages: ~50% train, ~20% validation, ~30% test.
+  - Normal packages: 50% train, 20% validation, 30% test.
   - Malicious packages: by package name (all releases of a name stay
-    together): ~20% validation, ~80% test. Malware is never used to fit
+    together): 20% validation, 80% test. Malware is never used to fit
     the unsupervised detectors.
   - Each detector's preprocessing and settings are chosen on VALIDATION,
     using partial ROC-AUC up to 5% false positives (the region that matters
@@ -28,6 +28,7 @@ Reports (test set)
 Results are also saved as CSV in RESULTS_DIR.
 """
 
+import argparse
 import os
 
 import numpy as np
@@ -112,12 +113,26 @@ def precision_at(tpr, fpr, n):
     return tpr * p / denom if denom else float("nan")
 
 
-def evaluate(name, s, y, hard, gd_tpr, gd_fpr):
-    """All test metrics for one method's scores `s`."""
+def evaluate(name, s, y, hard, gd_tpr, gd_fpr, w, gd_flag=None):
+    """All test metrics for one method's scores `s`.
+    w = family weights (malware: 1 / kept members of its family; normal: 1),
+    used for the family-weighted metrics where every family counts equally."""
     keep_hard = (y == 0) | hard
     row = {"method": name,
            "auc_all": roc_auc_score(y, s),
            "auc_hard": roc_auc_score(y[keep_hard], s[keep_hard])}
+
+    # family-weighted: ROC-AUC, and share of families' weight caught at 1% FPR
+    # and at GuardDog's FPR (thresholds always set on normal packages)
+    wm = w[y == 1]
+    row["auc_all_fw"] = roc_auc_score(y, s, sample_weight=w)
+    if gd_flag is not None:
+        row["tpr@fpr1%_fw"] = np.nan
+        row["tpr@gd_fpr_fw"] = float(np.sum(wm * gd_flag[y == 1]) / np.sum(wm))
+    else:
+        for f, key in [(0.01, "tpr@fpr1%_fw"), (gd_fpr, "tpr@gd_fpr_fw")]:
+            threshold = np.quantile(s[y == 0], 1 - f)
+            row[key] = float(np.sum(wm * (s[y == 1] > threshold)) / np.sum(wm))
     if name == "GuardDog rule":  # a fixed rule has one operating point
         tpr, fpr, tpr_hard = gd_tpr, gd_fpr, 0.0
         tpr1 = fpr1 = np.nan
@@ -137,6 +152,12 @@ def evaluate(name, s, y, hard, gd_tpr, gd_fpr):
 
 
 def main():
+    ap = argparse.ArgumentParser(description="Feature-level baselines")
+    ap.add_argument("--splits", default="splits.csv",
+                    help="split file in DATA_DIR: splits.csv or splits_campaign.csv")
+    args = ap.parse_args()
+    tag = os.path.splitext(args.splits)[0]  # used in output file names
+
     # ---- Load features ----
     feats = pd.concat([load("malicious", 1), load("normal", 0)], ignore_index=True)
     y_all = feats["label"].values
@@ -161,15 +182,22 @@ def main():
     # ---- Split: fixed assignment from splits.csv (created by make_splits.py) ----
     # All methods (baselines, GNN) use this same file, so they are evaluated
     # on exactly the same packages.
-    splits = pd.read_csv(f"{DATA_DIR}/splits.csv", dtype={"Version": str})
+    splits = pd.read_csv(f"{DATA_DIR}/{args.splits}", dtype={"Version": str})
     split = feats["path"].map(dict(zip(splits["path"], splits["split"])))
     if split.isna().any():
-        raise SystemExit(f"{int(split.isna().sum())} packages are missing from splits.csv: "
-                         "run src/make_splits.py first")
+        raise SystemExit(f"{int(split.isna().sum())} packages are missing from {args.splits}: "
+                         "run the matching split script first")
+    # family weights (only in the campaign split file; otherwise every package counts 1)
+    if "family_weight" in splits.columns:
+        w_all = feats["path"].map(dict(zip(splits["path"], splits["family_weight"]))).values.astype(float)
+    else:
+        w_all = np.ones(len(feats))
+    print(f"Split file: {args.splits} | excluded by family cap: {int((split == 'excluded').sum())}")
     train_idx = np.where((split == "train") & (y_all == 0))[0]
     val_idx = np.where(split == "val")[0]
     test_idx = np.where(split == "test")[0]
     y_val, y = y_all[val_idx], y_all[test_idx]
+    w = w_all[test_idx]
     hard = (y == 1) & (gd_flagged[test_idx] == 0)
     print(f"Train: {len(train_idx)} normal | Validation: {(y_val == 0).sum()} normal + "
           f"{(y_val == 1).sum()} malicious | Test: {(y == 0).sum()} normal + {(y == 1).sum()} "
@@ -183,7 +211,7 @@ def main():
     gd_tpr, gd_fpr = gd_test[y == 1].mean(), gd_test[y == 0].mean()
     print(f"\nGuardDog flags {gd_tpr:.1%} of test malware and {gd_fpr:.1%} of test normal packages")
     rows = [evaluate("GuardDog rule", feats["code_issue_count"].values[test_idx] + gd_test,
-                     y, hard, gd_tpr, gd_fpr)]
+                     y, hard, gd_tpr, gd_fpr, w, gd_flag=gd_test)]
     chosen = []
 
     for set_name, cols in feature_sets.items():
@@ -198,7 +226,7 @@ def main():
             iso.fit(X_raw[train_idx])
             seed_rows.append(evaluate(f"IsolationForest ({set_name})",
                                       -iso.decision_function(X_raw[test_idx]),
-                                      y, hard, gd_tpr, gd_fpr))
+                                      y, hard, gd_tpr, gd_fpr, w))
         seed_df = pd.DataFrame(seed_rows)
         row = seed_df.drop(columns="method").mean().to_dict()
         row["method"] = f"IsolationForest ({set_name})"
@@ -217,7 +245,7 @@ def main():
                     best = (score, f"{mode}, n_neighbors={k}", lof, mode)
         name = f"LOF ({set_name})"
         rows.append(evaluate(name, -best[2].decision_function(X_prep[best[3]][test_idx]),
-                             y, hard, gd_tpr, gd_fpr))
+                             y, hard, gd_tpr, gd_fpr, w))
         chosen.append({"method": name, "setting": best[1], "val_pauc": best[0]})
 
         # ---- One-Class SVM ----
@@ -232,7 +260,7 @@ def main():
                         best = (score, f"{mode}, nu={nu}, gamma={g}/n_features", ocsvm, mode)
         name = f"OneClassSVM ({set_name})"
         rows.append(evaluate(name, -best[2].decision_function(X_prep[best[3]][test_idx]),
-                             y, hard, gd_tpr, gd_fpr))
+                             y, hard, gd_tpr, gd_fpr, w))
         chosen.append({"method": name, "setting": best[1], "val_pauc": best[0]})
 
     # ---- Random Forest (supervised REFERENCE, uses labels) ----
@@ -247,7 +275,7 @@ def main():
     rf.fit(feats[cols].values[fit_idx], y_all[fit_idx])
     rows.append(evaluate("RandomForest (supervised reference)",
                          rf.predict_proba(feats[cols].values[test_idx])[:, 1],
-                         y, hard, gd_tpr, gd_fpr))
+                         y, hard, gd_tpr, gd_fpr, w))
     chosen.append({"method": "RandomForest (supervised reference)",
                    "setting": "300 trees, class_weight=balanced"})
 
@@ -296,12 +324,20 @@ def main():
         print(f"{r['method']:48s}" + "".join(
             f"{'-':>17s}" if pd.isna(r[h]) else f"{r[h]:17.3f}" for h in header2))
 
+    print("\n=== Family-weighted results (every campaign family counts equally) ===")
+    header3 = ["auc_all_fw", "tpr@fpr1%_fw", "tpr@gd_fpr_fw"]
+    labels3 = ["ROC-AUC", "caught@1%FPR", "caught@GD-FPR"]
+    print(f"{'':48s}" + "".join(f"{h:>17s}" for h in labels3))
+    for _, r in results.iterrows():
+        print(f"{r['method']:48s}" + "".join(
+            f"{'-':>17s}" if pd.isna(r[h]) else f"{r[h]:17.3f}" for h in header3))
+
     print("\n=== Top 15 single features (ROC-AUC, direction-free, all packages) ===")
     print(feat_auc.head(15).round(4).to_string(index=False))
 
     os.makedirs(RESULTS_DIR, exist_ok=True)
-    results.to_csv(f"{RESULTS_DIR}/baseline_results.csv", index=False)
-    chosen.to_csv(f"{RESULTS_DIR}/baseline_chosen_settings.csv", index=False)
+    results.to_csv(f"{RESULTS_DIR}/baseline_results_{tag}.csv", index=False)
+    chosen.to_csv(f"{RESULTS_DIR}/baseline_chosen_settings_{tag}.csv", index=False)
     feat_auc.to_csv(f"{RESULTS_DIR}/feature_auc.csv", index=False)
     print(f"\nSaved to {RESULTS_DIR}/")
 
