@@ -325,6 +325,9 @@ def main():
             f"{'-':>17s}" if pd.isna(r[h]) else f"{r[h]:17.3f}" for h in header2))
 
     print("\n=== Family-weighted results (every campaign family counts equally) ===")
+    
+    if np.all(w == 1):
+        print("(this split file has no family weights: identical to package-level results)")
     header3 = ["auc_all_fw", "tpr@fpr1%_fw", "tpr@gd_fpr_fw"]
     labels3 = ["ROC-AUC", "caught@1%FPR", "caught@GD-FPR"]
     print(f"{'':48s}" + "".join(f"{h:>17s}" for h in labels3))

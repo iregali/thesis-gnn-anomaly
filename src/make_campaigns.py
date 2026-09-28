@@ -248,7 +248,9 @@ def main():
           f"({100 * n_single / n:.1f}% of archives)")
     print(f"without .py files: {int(df['fingerprint'].str.startswith('nopy:').sum())} | "
           f"unreadable: {int(df['fingerprint'].str.startswith('unreadable:').sum())}")
-
+    no_code = df["fingerprint"].str.startswith(("nopy:", "unreadable:"))
+    genuine = int(((df["campaign_size"] == 1) & ~no_code).sum())
+    print(f"genuine singletons (readable code, no relatives): {genuine} ({100 * genuine / n:.1f}% of archives)")
     buckets = pd.cut(campaigns["size"], bins=[0, 1, 5, 20, 100, 10**9],
                      labels=["1", "2-5", "6-20", "21-100", ">100"])
     print("\ncampaign sizes (number of campaigns, number of archives):")
