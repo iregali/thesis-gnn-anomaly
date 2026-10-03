@@ -77,11 +77,15 @@ def load_inputs(data_dir, splits_file):
     """Package features, split assignment, dependency edges, name features."""
     feats = pd.concat([load("malicious", 1), load("normal", 0)], ignore_index=True)
     splits = pd.read_csv(f"{data_dir}/{splits_file}", dtype={"Version": str})
-    deps = pd.concat([pd.read_csv(f"{data_dir}/deps_{c}_edges.csv", dtype={"Version": str})
+    deps = pd.concat([pd.read_csv(f"{data_dir}/deps_{c}_edges.csv", dtype=str, keep_default_na=False)
                       for c in ["malicious", "normal"]], ignore_index=True)
     dep_pkgs = pd.concat([pd.read_csv(f"{data_dir}/deps_{c}_packages.csv", dtype={"Version": str})
                           for c in ["malicious", "normal"]], ignore_index=True)
     names = pd.read_csv(f"{data_dir}/name_features.csv", keep_default_na=False)
+    # package names such as "null" / "nan" / "None" are real names, not missing values
+    # (make_typosquat_edges.py reads them the same way)
+    deps["optional"] = deps["optional"].astype(int)
+    deps = deps[deps["dep"] != ""]
     feats = feats.merge(dep_pkgs[["path"] + DEP_FEATURES].drop_duplicates("path"), on="path", how="left")
     # as in the baselines: failed GuardDog scans count as "no findings"
     failed = feats["scan_failed"].fillna(1) == 1
@@ -176,7 +180,9 @@ def build_bundle(feats, splits, deps, names, level, seed, optional=False):
     cols = feature_columns(feats)
     assert not set(cols) & {"family_weight", "campaign_id", "split", "label"}, cols
     name_tab = name_feature_table(names)
-    zero_name = np.zeros(len(NAME_FEATURES))
+    # names without a row in name_features.csv: same defaults as the baselines
+    # (min_dist_to_popular = 3 = "far from every popular name", not 0)
+    zero_name = np.array([{"min_dist_to_popular": 3.0}.get(f, 0.0) for f in NAME_FEATURES])
 
     def name_feats(name_list):
         return np.stack([name_tab.loc[n].values if n in name_tab.index else zero_name

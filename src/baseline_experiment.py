@@ -71,6 +71,9 @@ BASE_RATES = [200, 1000]  # "1 in N uploads is malicious"
 def load(cls, label):
     """Static + GuardDog features for one class, merged per archive."""
     static = pd.read_csv(f"{DATA_DIR}/static_{cls}.csv", dtype={"Version": str})
+    # names like "null" / "nan" are real package names, not missing values
+    static["Name"] = pd.read_csv(f"{DATA_DIR}/static_{cls}.csv", usecols=["Name"], dtype=str,
+                                 keep_default_na=False)["Name"].values
     gd = pd.read_csv(f"{DATA_DIR}/guarddog_{cls}.csv", dtype={"Version": str})
 
     # Only readable sdists: wheels and unreadable archives exist only in
