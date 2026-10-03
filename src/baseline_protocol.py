@@ -30,6 +30,17 @@ Metrics (test set)
   - 95% confidence intervals by cluster bootstrap: normal packages resampled
     individually, malicious packages resampled BY FAMILY
 
+Diagnostics (contamination analysis)
+  - per-seed spread of family-weighted ROC-AUC and detection at 1% FPR
+    (mean, std, min, max), and the per-seed values in the log
+  - subset metrics: ROC-AUC and detection at 1% FPR on GuardDog-FLAGGED test
+    malware vs GuardDog-HARD test malware (masking check: if contamination
+    teaches a detector that "GuardDog-flagged" is normal, the flagged subset
+    collapses while the hard subset does not)
+  - composition of each contamination draw (GuardDog-flagged share, families)
+  - chosen settings per level, printed next to the results
+  - precision ceiling (perfect detector at 1% FPR) next to the precision columns
+
 Usage
   python src/baseline_protocol.py
   python src/baseline_protocol.py --levels 0 0.05 --seeds 0 --boot 200   # quicker
@@ -82,12 +93,15 @@ def pep503(name):
 def load(cls, label):
     """Static + GuardDog + dependency counts + name features, one row per archive."""
     static = pd.read_csv(f"{DATA_DIR}/static_{cls}.csv", dtype={"Version": str})
+    # names like "null" / "nan" are real package names, not missing values
+    static["Name"] = pd.read_csv(f"{DATA_DIR}/static_{cls}.csv", usecols=["Name"], dtype=str,
+                                 keep_default_na=False)["Name"].values
     static = static[(static["archive_type"] == "sdist") & (static["read_failed"] == 0)]
 
     gd = pd.read_csv(f"{DATA_DIR}/guarddog_{cls}.csv", dtype={"Version": str})
     gd = gd[["path", "scan_failed", "code_issue_count"] + GD_GROUPS].drop_duplicates("path")
     deps = pd.read_csv(f"{DATA_DIR}/deps_{cls}_packages.csv", usecols=["path"] + DEP_COLS)
-    names = pd.read_csv(f"{DATA_DIR}/name_features.csv", usecols=["name"] + NAME_COLS)
+    names = pd.read_csv(f"{DATA_DIR}/name_features.csv", usecols=["name"] + NAME_COLS, keep_default_na=False)
 
     df = static.merge(gd, on="path", how="left").merge(deps, on="path", how="left")
     df["_name"] = df["Name"].map(pep503)
@@ -143,8 +157,10 @@ def precision_at(tpr, fpr, n):
 def point_metrics(s, y, w, hard, gd_fpr, flag=None):
     """Point estimates. flag = binary decisions for a fixed rule (GuardDog)."""
     keep_hard = (y == 0) | hard
+    keep_flag = (y == 0) | ((y == 1) & ~hard)   # normal + GuardDog-flagged malware
     m = {"auc": roc_auc_score(y, s), "auc_fw": roc_auc_score(y, s, sample_weight=w),
-         "auc_hard": roc_auc_score(y[keep_hard], s[keep_hard])}
+         "auc_hard": roc_auc_score(y[keep_hard], s[keep_hard]),
+         "auc_flagged": roc_auc_score(y[keep_flag], s[keep_flag])}
     if flag is not None:
         m["tpr1"] = m["tpr1_fw"] = np.nan
         m["tpr_gd"] = float(flag[y == 1].mean())
@@ -155,8 +171,14 @@ def point_metrics(s, y, w, hard, gd_fpr, flag=None):
     else:
         m["tpr1"], m["tpr1_fw"] = tpr_at_fpr(s, y, w, 0.01)
         m["tpr_gd"], m["tpr_gd_fw"] = tpr_at_fpr(s, y, w, gd_fpr)
+        # detection at 1% FPR within each malware subset (threshold from ALL normals)
+        thr = np.quantile(s[y == 0], 0.99)
+        for sub, mask in [("flagged", (y == 1) & ~hard), ("hard", hard)]:
+            m[f"tpr1_{sub}_fw"] = float(np.sum(w[mask] * (s[mask] > thr)) / np.sum(w[mask])) \
+                if mask.any() else np.nan
         for k, n in BASE_RATES.items():
-            m[f"prec@1%FPR_{k}"] = precision_at(m["tpr1"], 0.01, n)
+            m[f"prec@1%FPR_{k}"] = precision_at(m["tpr1"], 0.01, n)          # package-level TPR
+            m[f"prec_fw@1%FPR_{k}"] = precision_at(m["tpr1_fw"], 0.01, n)    # family-weighted TPR
     return m
 
 
@@ -181,7 +203,8 @@ def bootstrap_ci(s, y, w, fam, n_boot, seed=0, flag=None):
             tprs.append(np.sum(ws[ys == 1] * f[ys == 1]) / np.sum(ws[ys == 1]))
     q = lambda v: (np.percentile(v, 2.5), np.percentile(v, 97.5))  # noqa: E731
     (a_lo, a_hi), (t_lo, t_hi) = q(aucs), q(tprs)
-    return {"auc_fw_lo": a_lo, "auc_fw_hi": a_hi, "tpr_fw_lo": t_lo, "tpr_fw_hi": t_hi}
+    t = "tpr_fw" if flag is None else "tpr_gd_fw"   # CI of detection @1% FPR, or of GuardDog's own rate
+    return {"auc_fw_lo": a_lo, "auc_fw_hi": a_hi, f"{t}_lo": t_lo, f"{t}_hi": t_hi}
 
 
 # ---------------------------------------------------------------------------
@@ -253,7 +276,28 @@ def main():
     r = {"level": "all", "method": "GuardDog rule", **point_metrics(gd_score, y, w, hard, gd_fpr, flag=gd_flag),
          **bootstrap_ci(gd_score, y, w, fam, args.boot, flag=gd_flag)}
     rows.append(r)
-    print(f"GuardDog: flags {r['tpr_gd']:.1%} of test malware, FPR {gd_fpr:.1%}")
+    print(f"GuardDog: flags {r['tpr_gd']:.1%} of test malware, FPR {gd_fpr:.1%} | "
+          f"family-weighted {r['tpr_gd_fw']:.1%} [{r['tpr_gd_fw_lo']:.1%}, {r['tpr_gd_fw_hi']:.1%}]")
+    print(f"test malware: {int(((y == 1) & ~hard).sum())} GuardDog-flagged, {int(hard.sum())} GuardDog-hard")
+
+    # composition of the contamination draws (same for every detector at a level)
+    gd_of_path = dict(zip(feats["path"], feats["gd_flagged"]))
+    fam_of_path = dict(zip(feats["path"], fam_all))
+    comp = []
+    for level in args.levels:
+        if level == 0:
+            continue
+        for seed in args.seeds:
+            drawn = draw_contamination(pool_paths, level, len(train_idx), seed)
+            comp.append({"level": level, "seed": seed, "n": len(drawn),
+                         "gd_flagged_share": np.mean([gd_of_path[p] for p in drawn]),
+                         "families": len({fam_of_path[p] for p in drawn})})
+    if comp:
+        comp = pd.DataFrame(comp)
+        print("\n=== Contamination draws ===")
+        print(comp.round(3).to_string(index=False))
+        pool_flag = np.mean([gd_of_path[p] for p in pool_paths])
+        print(f"(whole pool: {len(pool_paths)} packages, GuardDog-flagged share {pool_flag:.3f})\n")
 
     for level in args.levels:
         for set_name, cols in feature_sets.items():
@@ -293,11 +337,21 @@ def main():
                 name = f"{kind} ({set_name})"
                 row = {"level": level, "method": name, **point_metrics(s_ens, y, w, hard, gd_fpr),
                        **bootstrap_ci(s_ens, y, w, fam, args.boot)}
-                row["auc_fw_seed_std"] = pd.DataFrame(seed_rows)["auc_fw"].std() if len(seed_rows) > 1 else 0.0
+                per_seed = pd.DataFrame(seed_rows)
+                for col in ["auc_fw", "tpr1_fw", "tpr1_flagged_fw", "tpr1_hard_fw"]:
+                    v = per_seed[col]
+                    row[f"{col}_seed_mean"] = v.mean()
+                    row[f"{col}_seed_std"] = v.std() if len(v) > 1 else 0.0
+                    row[f"{col}_seed_min"], row[f"{col}_seed_max"] = v.min(), v.max()
+                row["setting"] = str(setting)
                 rows.append(row)
                 print(f"level {level:.0%} | {name:42s} ROC-AUC (fw) {row['auc_fw']:.3f} "
                       f"[{row['auc_fw_lo']:.3f}, {row['auc_fw_hi']:.3f}] | caught@1%FPR (fw) "
-                      f"{row['tpr1_fw']:.1%} [{row['tpr_fw_lo']:.1%}, {row['tpr_fw_hi']:.1%}]", flush=True)
+                      f"{row['tpr1_fw']:.1%} [{row['tpr_fw_lo']:.1%}, {row['tpr_fw_hi']:.1%}] | "
+                      f"flagged {row['tpr1_flagged_fw']:.1%}, hard {row['tpr1_hard_fw']:.1%}", flush=True)
+                print(f"    per seed: caught@1%FPR (fw) "
+                      f"{', '.join(f'{v:.1%}' for v in per_seed['tpr1_fw'])} | ROC-AUC (fw) "
+                      f"{', '.join(f'{v:.3f}' for v in per_seed['auc_fw'])} | setting {setting}", flush=True)
 
     # Supervised reference: trained on training normals + the whole contamination pool (labelled)
     cols = feature_sets["static+deps+names+GuardDog"]
@@ -312,14 +366,32 @@ def main():
     os.makedirs(RESULTS_DIR, exist_ok=True)
     results.to_csv(f"{RESULTS_DIR}/baseline_protocol_results.csv", index=False)
     chosen.to_csv(f"{RESULTS_DIR}/baseline_protocol_settings.csv", index=False)
+    if len(comp):
+        comp.to_csv(f"{RESULTS_DIR}/baseline_protocol_contamination.csv", index=False)
 
     pd.set_option("display.width", 220)
     show = ["level", "method", "auc", "auc_fw", "auc_fw_lo", "auc_fw_hi", "tpr1", "tpr1_fw",
             "tpr_fw_lo", "tpr_fw_hi", "tpr_gd", "tpr_gd_fw", "auc_hard"]
     print("\n=== Test results (fw = family-weighted; lo/hi = 95% bootstrap CI) ===")
     print(results[show].round(3).to_string(index=False))
-    prec = [c for c in results.columns if c.startswith("prec@")]
+
+    print("\n=== Masking check: GuardDog-flagged vs GuardDog-hard test malware ===")
+    sub = ["level", "method", "auc_flagged", "auc_hard", "tpr1_fw", "tpr1_flagged_fw", "tpr1_hard_fw"]
+    print(results[sub].round(3).to_string(index=False))
+
+    print("\n=== Seed spread (family-weighted; one contamination draw per seed) ===")
+    spread = ["level", "method"] + [f"{c}_seed_{k}" for c in ["auc_fw", "tpr1_fw"]
+                                    for k in ["mean", "std", "min", "max"]]
+    print(results.loc[results["level"].isin(args.levels), spread].round(3).to_string(index=False))
+
+    print("\n=== Settings chosen on validation ===")
+    print(chosen.round(3).to_string(index=False))
+
+    prec = [c for c in results.columns if c.startswith("prec")]
     print("\n=== Precision at realistic base rates ===")
+    print("ceiling (perfect detector at 1% FPR): " +
+          ", ".join(f"{k} {precision_at(1.0, 0.01, n):.3f}" for k, n in BASE_RATES.items()))
+    print("prec@ = package-level TPR, prec_fw@ = family-weighted TPR; GuardDog at its own FPR")
     print(results[["level", "method"] + prec].round(3).to_string(index=False))
     print(f"\nSaved to {RESULTS_DIR}/baseline_protocol_*.csv")
 
