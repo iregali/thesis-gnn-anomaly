@@ -297,6 +297,11 @@ def insert_package(bundle, i):
 
 
 def load_bundle(path):
+    # Bundles built by running this file as a script store the Scaler as
+    # __main__.Scaler; make that name resolvable from any calling script.
+    import __main__
+    if not hasattr(__main__, "Scaler"):
+        __main__.Scaler = Scaler
     return torch.load(path, weights_only=False)
 
 
