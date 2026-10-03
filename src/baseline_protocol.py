@@ -49,12 +49,34 @@ Diagnostics (contamination analysis)
   - chosen settings per level, printed next to the results
   - precision ceiling (perfect detector at 1% FPR) next to the precision columns
 
+Variants (--variants; rows of the naive variant are identical to earlier runs)
+  naive   the original grid: preprocessing x detector settings
+  robust  naive grid + robust preprocessing (median/IQR, flags raw) + trim-and-refit:
+          fit, drop the k most anomalous fraction of the TRAINING packages (no
+          labels), refit; k in TRIM_FRACTIONS, k = 0 included. Chosen on validation
+          like every other setting, so at 0% it can always reproduce the naive model.
+  fixed   diagnostic: the naive settings chosen at 0%, reused at every level
+          (separates "contamination damages model selection" from "contamination
+          damages the model"); only reported for levels > 0.
+
+Ablation (--feature-sets): static | static+GuardDog | static+deps+names |
+static+deps+names+GuardDog (default: the last two, as before).
+
+Normal resampling (--normal-salt S): reassigns the NORMAL packages to
+train/val/test (50/20/30, by salted hash of the name, all releases together);
+malware roles unchanged. Measures how much results depend on which normal
+packages were drawn (not covered by the bootstrap). Outputs get a suffix.
+
 Usage
   python src/baseline_protocol.py
   python src/baseline_protocol.py --levels 0 0.05 --seeds 0 --boot 200   # quicker
+  python src/baseline_protocol.py --variants naive robust fixed \
+      --feature-sets static static+GuardDog static+deps+names static+deps+names+GuardDog --tag _robust
+  python src/baseline_protocol.py --levels 0 0.01 --normal-salt 1        # resampling check
 """
 
 import argparse
+import hashlib
 import os
 import re
 
@@ -87,6 +109,9 @@ NEW_PROJECT_DAYS = 30
 NAME_COLS = ["min_dist_to_popular", "n_typosquat_targets", "has_typosquat_edge"]
 
 PREPROCESSING = ["scale_all", "binary_raw"]
+PREPROCESSING_ROBUST = PREPROCESSING + ["robust"]
+TRIM_FRACTIONS = [0.0, 0.01, 0.02, 0.05]  # share of training packages dropped before refitting
+EXTRA_FPRS = {"tpr05_fw": 0.005, "tpr2_fw": 0.02}  # extra operating points (family-weighted)
 OCSVM_NU = [0.01, 0.05, 0.1]
 OCSVM_GAMMA = [0.1, 1.0, 10.0]  # times 1 / n_features
 LOF_NEIGHBORS = [10, 35, 100]
@@ -140,11 +165,23 @@ def load_features():
 
 
 def preprocess(X, fit_idx, mode):
-    """log1p on non-negative continuous columns, then standardize on fit_idx."""
+    """log1p on non-negative continuous columns, then scale with statistics of fit_idx.
+    scale_all / binary_raw: standardize (all columns / continuous only).
+    robust: continuous columns centred on the median and scaled by IQR/1.349
+    (fallback: std, then 1); 0/1 flags left raw. Median and IQR barely move
+    when a few percent of the fit rows are malware, unlike mean and std."""
     X = X.copy()
     cont = np.ones(X.shape[1], dtype=bool) if mode == "scale_all" else ~np.all(np.isin(X, [0, 1]), axis=0)
     nonneg = cont & (X.min(axis=0) >= 0)
     X[:, nonneg] = np.log1p(X[:, nonneg])
+    if mode == "robust":
+        F = X[fit_idx][:, cont]
+        med = np.median(F, axis=0)
+        iqr = (np.percentile(F, 75, axis=0) - np.percentile(F, 25, axis=0)) / 1.349
+        std = F.std(axis=0)
+        scale = np.where(iqr > 0, iqr, np.where(std > 0, std, 1.0))
+        X[:, cont] = (X[:, cont] - med) / scale
+        return X
     scaler = StandardScaler().fit(X[fit_idx][:, cont])
     X[:, cont] = scaler.transform(X[:, cont])
     return X
@@ -181,6 +218,8 @@ def point_metrics(s, y, w, hard, gd_fpr, flag=None):
     else:
         m["tpr1"], m["tpr1_fw"] = tpr_at_fpr(s, y, w, 0.01)
         m["tpr_gd"], m["tpr_gd_fw"] = tpr_at_fpr(s, y, w, gd_fpr)
+        for key, f in EXTRA_FPRS.items():
+            m[key] = tpr_at_fpr(s, y, w, f)[1]
         # detection at 1% FPR within each malware subset (threshold from ALL normals)
         thr = np.quantile(s[y == 0], 0.99)
         for sub, mask in [("flagged", (y == 1) & ~hard), ("hard", hard)]:
@@ -262,22 +301,47 @@ def bootstrap_ci(s, y, w, fam, n_boot, seed=0, flag=None):
 # ---------------------------------------------------------------------------
 # Detectors
 # ---------------------------------------------------------------------------
-def fit_score(kind, setting, X_fit, X_score, seed):
+def make_model(kind, setting, seed, n_features):
     if kind == "IF":
-        m = IsolationForest(n_estimators=300, random_state=seed, n_jobs=2).fit(X_fit)
-    elif kind == "LOF":
-        m = LocalOutlierFactor(n_neighbors=setting["k"], novelty=True).fit(X_fit)
-    else:
-        m = OneClassSVM(kernel="rbf", gamma=setting["g"] / X_fit.shape[1], nu=setting["nu"]).fit(X_fit)
-    return -m.decision_function(X_score)
-
-
-def candidates(kind):
-    if kind == "IF":
-        return [{"mode": "raw"}]
+        return IsolationForest(n_estimators=300, random_state=seed, n_jobs=2)
     if kind == "LOF":
-        return [{"mode": p, "k": k} for p in PREPROCESSING for k in LOF_NEIGHBORS]
-    return [{"mode": p, "nu": nu, "g": g} for p in PREPROCESSING for nu in OCSVM_NU for g in OCSVM_GAMMA]
+        return LocalOutlierFactor(n_neighbors=setting["k"], novelty=True)
+    return OneClassSVM(kernel="rbf", gamma=setting["g"] / n_features, nu=setting["nu"])
+
+
+def fit_model(kind, setting, X_fit, seed, base=None):
+    """Fit; with setting["trim"] = k > 0, drop the k most anomalous fraction of
+    the fit rows (by the first model's own training scores) and refit. `base` =
+    an already fitted untrimmed model with the same setting (saves a fit)."""
+    m = base if base is not None else make_model(kind, setting, seed, X_fit.shape[1]).fit(X_fit)
+    k = setting.get("trim", 0.0)
+    if k > 0:
+        s_fit = -m.negative_outlier_factor_ if kind == "LOF" else -m.decision_function(X_fit)
+        keep = s_fit <= np.quantile(s_fit, 1 - k)
+        m = make_model(kind, setting, seed, X_fit.shape[1]).fit(X_fit[keep])
+    return m
+
+
+def fit_score(kind, setting, X_fit, X_score, seed):
+    return -fit_model(kind, setting, X_fit, seed).decision_function(X_score)
+
+
+def candidates(kind, robust=False):
+    """Settings grid. robust=True adds robust preprocessing and trim-and-refit."""
+    preps = PREPROCESSING_ROBUST if robust else PREPROCESSING
+    trims = TRIM_FRACTIONS if robust else [0.0]
+    if kind == "IF":  # tree splits are scale-free: preprocessing does not matter
+        base = [{"mode": "raw"}]
+    elif kind == "LOF":
+        base = [{"mode": p, "k": k} for p in preps for k in LOF_NEIGHBORS]
+    else:
+        base = [{"mode": p, "nu": nu, "g": g} for p in preps for nu in OCSVM_NU for g in OCSVM_GAMMA]
+    return [{**b, "trim": t} for b in base for t in trims]
+
+
+def setting_key(setting):
+    """Setting without the trim fraction (candidates sharing it share the first fit)."""
+    return str({k: v for k, v in setting.items() if k != "trim"})
 
 
 def to_ranks(s):
@@ -292,7 +356,16 @@ def main():
     ap.add_argument("--levels", type=float, nargs="*", default=LEVELS)
     ap.add_argument("--seeds", type=int, nargs="*", default=SEEDS)
     ap.add_argument("--boot", type=int, default=500)
+    ap.add_argument("--variants", nargs="*", default=["naive"], choices=["naive", "robust", "fixed"])
+    ap.add_argument("--feature-sets", nargs="*", default=["static+deps+names", "static+deps+names+GuardDog"],
+                    choices=["static", "static+GuardDog", "static+deps+names", "static+deps+names+GuardDog"])
+    ap.add_argument("--normal-salt", default=None, help="reassign normal packages with this salt")
+    ap.add_argument("--tag", default=None, help="suffix for the output files")
     args = ap.parse_args()
+    args.levels = sorted(args.levels)
+    if "fixed" in args.variants and (0.0 not in args.levels or "naive" not in args.variants):
+        raise SystemExit("--variants fixed needs level 0 and the naive variant")
+    tag = args.tag if args.tag is not None else (f"_salt{args.normal_salt}" if args.normal_salt else "")
 
     feats, groups = load_features()
     y_all = feats["label"].values
@@ -300,6 +373,15 @@ def main():
     role = feats["path"].map(dict(zip(splits["path"], splits["split"])))
     if role.isna().any():
         raise SystemExit(f"{int(role.isna().sum())} packages missing from {SPLIT_FILE}")
+    if args.normal_salt is not None:
+        u = feats["Name"].map(lambda n: int(hashlib.sha256(f"{args.normal_salt}:{pep503(n)}".encode())
+                                            .hexdigest(), 16) / 16 ** 64)
+        new = np.where(u < 0.5, "train", np.where(u < 0.7, "val", "test"))
+        normal = y_all == 0
+        role = role.where(~normal, pd.Series(new, index=role.index))
+        print(f"[normal resampling] salt {args.normal_salt}: normal train/val/test = "
+              f"{int((role[normal] == 'train').sum())}/{int((role[normal] == 'val').sum())}/"
+              f"{int((role[normal] == 'test').sum())} (malware roles unchanged)")
     fam_all = feats["path"].map(dict(zip(splits["path"], splits["campaign_id"]))).fillna("").values
     w_all = feats["path"].map(dict(zip(splits["path"], splits["family_weight"].astype(float)))).values
 
@@ -332,10 +414,13 @@ def main():
         print("test groups used: " + ", ".join(f"{g} {int(m.sum())}" for g, m in pop_groups.items()))
         print("(1% FPR within a group is decided by ~1% of its size: treat groups < 1,000 as rough)\n")
 
-    feature_sets = {
+    all_sets = {
+        "static": groups["static"],
+        "static+GuardDog": groups["static"] + groups["guarddog"],
         "static+deps+names": groups["static"] + groups["deps"] + groups["names"],
         "static+deps+names+GuardDog": groups["static"] + groups["deps"] + groups["names"] + groups["guarddog"],
     }
+    feature_sets = {k: all_sets[k] for k in args.feature_sets}
 
     rows, chosen = [], []
     # GuardDog rule: no training, same for every level
@@ -369,63 +454,79 @@ def main():
         pool_flag = np.mean([gd_of_path[p] for p in pool_paths])
         print(f"(whole pool: {len(pool_paths)} packages, GuardDog-flagged share {pool_flag:.3f})\n")
 
+    naive_at_0 = {}  # (feature set, detector) -> naive setting chosen at level 0 (for the fixed variant)
+    labels = {"naive": "", "robust": "+robust", "fixed": " [0% settings]"}
+
+    def run(level, set_name, X_raw, kind, variant):
+        """Choose settings on validation (seed 0), score test for every seed, return the row."""
+        setting = naive_at_0[(set_name, kind)] if variant == "fixed" else None
+        val_pauc, seed_scores, seed_rows = np.nan, [], []
+        for seed in args.seeds:
+            drawn = draw_contamination(pool_paths, level, len(train_idx), seed) if level > 0 else []
+            contam = [path_to_idx[p] for p in drawn]
+            fit_idx = np.concatenate([train_idx, np.array(contam, dtype=int)])
+            preps = {}
+
+            def X_for(mode):
+                if mode == "raw":
+                    return X_raw
+                if mode not in preps:
+                    preps[mode] = preprocess(X_raw, fit_idx, mode)
+                return preps[mode]
+
+            if setting is None:  # choose on validation with the first seed
+                best, bases = None, {}
+                for cand in candidates(kind, robust=(variant == "robust")):
+                    Xm = X_for(cand["mode"])
+                    key = setting_key(cand)
+                    if key not in bases:
+                        bases[key] = fit_model(kind, {**cand, "trim": 0.0}, Xm[fit_idx], seed)
+                    mdl = fit_model(kind, cand, Xm[fit_idx], seed, base=bases[key])
+                    sc = roc_auc_score(y_val, -mdl.decision_function(Xm[val_idx]), max_fpr=SELECT_MAX_FPR)
+                    if best is None or sc > best[0]:
+                        best = (sc, cand)
+                val_pauc, setting = best
+            Xm = X_for(setting["mode"])
+            s = fit_score(kind, setting, Xm[fit_idx], Xm[test_idx], seed)
+            seed_scores.append(to_ranks(s))
+            seed_rows.append(point_metrics(s, y, w, hard, gd_fpr))
+
+        chosen.append({"level": level, "features": set_name, "method": kind, "variant": variant,
+                       "setting": str(setting), "val_pauc": val_pauc})
+        if variant == "naive" and level == 0:
+            naive_at_0[(set_name, kind)] = setting
+        s_ens = np.mean(seed_scores, axis=0)
+        name = f"{kind}{labels[variant]} ({set_name})"
+        row = {"level": level, "method": name, "variant": variant, "features": set_name, "detector": kind,
+               **point_metrics(s_ens, y, w, hard, gd_fpr), **bootstrap_ci(s_ens, y, w, fam, args.boot),
+               **population_metrics(s_ens, y, w, pop_groups)}
+        per_seed = pd.DataFrame(seed_rows)
+        for col in ["auc_fw", "tpr1_fw", "tpr1_flagged_fw", "tpr1_hard_fw", *EXTRA_FPRS]:
+            v = per_seed[col]
+            row[f"{col}_seed_mean"] = v.mean()
+            row[f"{col}_seed_std"] = v.std() if len(v) > 1 else 0.0
+            row[f"{col}_seed_min"], row[f"{col}_seed_max"] = v.min(), v.max()
+        row["setting"] = str(setting)
+        print(f"level {level:.0%} | {name:52s} ROC-AUC (fw) {row['auc_fw']:.3f} "
+              f"[{row['auc_fw_lo']:.3f}, {row['auc_fw_hi']:.3f}] | caught@1%FPR (fw) "
+              f"{row['tpr1_fw']:.1%} [{row['tpr_fw_lo']:.1%}, {row['tpr_fw_hi']:.1%}] | "
+              f"flagged {row['tpr1_flagged_fw']:.1%}, hard {row['tpr1_hard_fw']:.1%}", flush=True)
+        print(f"    per seed: caught@1%FPR (fw) "
+              f"{', '.join(f'{v:.1%}' for v in per_seed['tpr1_fw'])} | ROC-AUC (fw) "
+              f"{', '.join(f'{v:.3f}' for v in per_seed['auc_fw'])} | setting {setting}", flush=True)
+        return row
+
     for level in args.levels:
         for set_name, cols in feature_sets.items():
             X_raw = feats[cols].fillna(0).values.astype(float)
             for kind in ["IF", "LOF", "OCSVM"]:
-                setting, seed_scores, seed_rows = None, [], []
-                for seed in args.seeds:
-                    drawn = draw_contamination(pool_paths, level, len(train_idx), seed) if level > 0 else []
-                    contam = [path_to_idx[p] for p in drawn]
-                    fit_idx = np.concatenate([train_idx, np.array(contam, dtype=int)])
-                    preps = {}
-
-                    def X_for(mode):
-                        if mode == "raw":
-                            return X_raw
-                        if mode not in preps:
-                            preps[mode] = preprocess(X_raw, fit_idx, mode)
-                        return preps[mode]
-
-                    if setting is None:  # choose on validation with the first seed
-                        best = None
-                        for cand in candidates(kind):
-                            Xm = X_for(cand["mode"])
-                            sv = fit_score(kind, cand, Xm[fit_idx], Xm[val_idx], seed)
-                            sc = roc_auc_score(y_val, sv, max_fpr=SELECT_MAX_FPR)
-                            if best is None or sc > best[0]:
-                                best = (sc, cand)
-                        setting = best[1]
-                        chosen.append({"level": level, "features": set_name, "method": kind,
-                                       "setting": str(setting), "val_pauc": best[0]})
-                    Xm = X_for(setting["mode"])
-                    s = fit_score(kind, setting, Xm[fit_idx], Xm[test_idx], seed)
-                    seed_scores.append(to_ranks(s))
-                    seed_rows.append(point_metrics(s, y, w, hard, gd_fpr))
-
-                s_ens = np.mean(seed_scores, axis=0)
-                name = f"{kind} ({set_name})"
-                row = {"level": level, "method": name, **point_metrics(s_ens, y, w, hard, gd_fpr),
-                       **bootstrap_ci(s_ens, y, w, fam, args.boot),
-                       **population_metrics(s_ens, y, w, pop_groups)}
-                per_seed = pd.DataFrame(seed_rows)
-                for col in ["auc_fw", "tpr1_fw", "tpr1_flagged_fw", "tpr1_hard_fw"]:
-                    v = per_seed[col]
-                    row[f"{col}_seed_mean"] = v.mean()
-                    row[f"{col}_seed_std"] = v.std() if len(v) > 1 else 0.0
-                    row[f"{col}_seed_min"], row[f"{col}_seed_max"] = v.min(), v.max()
-                row["setting"] = str(setting)
-                rows.append(row)
-                print(f"level {level:.0%} | {name:42s} ROC-AUC (fw) {row['auc_fw']:.3f} "
-                      f"[{row['auc_fw_lo']:.3f}, {row['auc_fw_hi']:.3f}] | caught@1%FPR (fw) "
-                      f"{row['tpr1_fw']:.1%} [{row['tpr_fw_lo']:.1%}, {row['tpr_fw_hi']:.1%}] | "
-                      f"flagged {row['tpr1_flagged_fw']:.1%}, hard {row['tpr1_hard_fw']:.1%}", flush=True)
-                print(f"    per seed: caught@1%FPR (fw) "
-                      f"{', '.join(f'{v:.1%}' for v in per_seed['tpr1_fw'])} | ROC-AUC (fw) "
-                      f"{', '.join(f'{v:.3f}' for v in per_seed['auc_fw'])} | setting {setting}", flush=True)
+                for variant in ["naive", "robust", "fixed"]:
+                    if variant not in args.variants or (variant == "fixed" and level == 0):
+                        continue
+                    rows.append(run(level, set_name, X_raw, kind, variant))
 
     # Supervised reference: trained on training normals + the whole contamination pool (labelled)
-    cols = feature_sets["static+deps+names+GuardDog"]
+    cols = all_sets["static+deps+names+GuardDog"]
     fit_idx = np.concatenate([train_idx, np.array([path_to_idx[p] for p in pool_paths], dtype=int)])
     rf = RandomForestClassifier(n_estimators=300, class_weight="balanced", random_state=0, n_jobs=2)
     rf.fit(feats[cols].fillna(0).values[fit_idx], y_all[fit_idx])
@@ -436,10 +537,10 @@ def main():
 
     results, chosen = pd.DataFrame(rows), pd.DataFrame(chosen)
     os.makedirs(RESULTS_DIR, exist_ok=True)
-    results.to_csv(f"{RESULTS_DIR}/baseline_protocol_results.csv", index=False)
-    chosen.to_csv(f"{RESULTS_DIR}/baseline_protocol_settings.csv", index=False)
+    results.to_csv(f"{RESULTS_DIR}/baseline_protocol_results{tag}.csv", index=False)
+    chosen.to_csv(f"{RESULTS_DIR}/baseline_protocol_settings{tag}.csv", index=False)
     if len(comp):
-        comp.to_csv(f"{RESULTS_DIR}/baseline_protocol_contamination.csv", index=False)
+        comp.to_csv(f"{RESULTS_DIR}/baseline_protocol_contamination{tag}.csv", index=False)
 
     pd.set_option("display.width", 220)
     show = ["level", "method", "auc", "auc_fw", "auc_fw_lo", "auc_fw_hi", "tpr1", "tpr1_fw",
@@ -474,7 +575,20 @@ def main():
         print(results[cols_p].round(3).to_string(index=False))
         prec_p = [c for c in results.columns if c.startswith("prec_fw_") and c.endswith("_1:65")]
         print(results[["level", "method", "prec_fw@1%FPR_per_project_1:65"] + prec_p].round(3).to_string(index=False))
-    print(f"\nSaved to {RESULTS_DIR}/baseline_protocol_*.csv")
+    print("\n=== Operating points (family-weighted, rank-average; seed mean for 1%) ===")
+    op = ["level", "method", "tpr05_fw", "tpr1_fw", "tpr1_fw_seed_mean", "tpr2_fw"]
+    print(results.loc[results["level"].isin(args.levels), op].round(3).to_string(index=False))
+
+    if len(args.variants) > 1:
+        det = results[results["level"].isin(args.levels)]
+        print("\n=== Variants side by side (ROC-AUC fw | caught @ 1% FPR fw, seed mean) ===")
+        for metric in ["auc_fw", "tpr1_fw_seed_mean"]:
+            piv = det.pivot_table(index=["features", "detector", "level"], columns="variant",
+                                  values=metric, aggfunc="first")
+            print(f"\n{metric}")
+            print(piv.round(3).to_string())
+
+    print(f"\nSaved to {RESULTS_DIR}/baseline_protocol_*{tag}.csv")
 
 
 if __name__ == "__main__":
