@@ -174,6 +174,7 @@ def build_bundle(feats, splits, deps, names, level, seed, optional=False):
 
     # features
     cols = feature_columns(feats)
+    assert not set(cols) & {"family_weight", "campaign_id", "split", "label"}, cols
     name_tab = name_feature_table(names)
     zero_name = np.zeros(len(NAME_FEATURES))
 
