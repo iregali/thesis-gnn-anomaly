@@ -64,8 +64,7 @@ from baseline_experiment import DATA_DIR, DROP_COLS, GD_GROUPS, ID_COLS, load
 NAME_FEATURES = ["min_dist_to_popular", "n_typosquat_targets", "has_typosquat_edge"]
 DEP_FEATURES = ["n_core", "n_optional"]
 GD_COLS = ["code_issue_count"] + GD_GROUPS
-NOT_FEATURES = set(ID_COLS) | set(DROP_COLS) | {"label", "scan_failed"}
-
+NOT_FEATURES = set(ID_COLS) | set(DROP_COLS) | {"label", "scan_failed", "family_weight", "campaign_id", "split"}
 
 def pep503(name):
     return re.sub(r"[-_.]+", "-", str(name)).lower()
