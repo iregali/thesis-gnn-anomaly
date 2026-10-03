@@ -11,10 +11,12 @@ looking at labels.
 Nodes considered: all evaluation packages (static_*.csv) and all dependency
 targets (deps_*_edges.csv), by normalized name (PEP 503).
 
-Reference: the most-downloaded PyPI packages (hugovk/top-pypi-packages, 30
-days), top N. Popular packages are targets, never sources. Note: the list
-is recent, while the malware spans 2021-2026; the most popular packages are
-stable over such periods, but this is a limitation to mention.
+Reference: the UNION of yearly snapshots (early July 2021-2026) of the most-
+downloaded PyPI packages (hugovk/top-pypi-packages, 30 days), top N of each
+(see fetch_popular_snapshots.py). Popularity shifts a lot between years, and
+the data spans 2021-2026, so no single list fits. Limitation: an early
+package can be compared with a name that only became popular later.
+Popular packages are targets, never sources.
 
 Rules (each edge records which rule produced it):
   edit       Damerau-Levenshtein distance (insert, delete, substitute, swap
@@ -30,19 +32,21 @@ Rules (each edge records which rule produced it):
 
 Outputs (DATA_DIR)
   typosquat_edges.csv   name, target, rule, distance, target_rank
-  name_features.csv     name, is_popular, min_dist_to_popular (capped at 3),
+  name_features.csv     name, is_popular, min_dist_to_popular (capped at 3; for
+                        popular names: distance to the nearest OTHER popular name),
                         nearest_popular, n_typosquat_targets, has_typosquat_edge
+                        is_popular is descriptive only: NEVER a model feature
+                        (removed malware can never be on a popularity list).
 
 Usage
   python src/make_typosquat_edges.py
-  python src/make_typosquat_edges.py --top 5000 --popular-file top-pypi-packages.min.json
+  python src/make_typosquat_edges.py --top 5000 --popular-dir ~/thesis/data/popular
 """
 
 import argparse
 import json
 import os
 import re
-import urllib.request
 
 import numpy as np
 import pandas as pd
@@ -50,8 +54,6 @@ from rapidfuzz.distance import DamerauLevenshtein
 from rapidfuzz.process import cdist
 
 DATA_DIR = "/home/igalimi1/thesis/data"
-POPULAR_URL = ("https://raw.githubusercontent.com/hugovk/top-pypi-packages/main/"
-               "top-pypi-packages.min.json")
 AFFIX_PRE = ["python-", "py-", "py"]
 AFFIX_SUF = ["-python", "-py", "-dev", "-lib", "-sdk", "-api", "2", "3"]
 
@@ -70,14 +72,21 @@ def max_dist(target_len):
     return 1 if target_len <= 8 else 2
 
 
-def load_popular(path, top):
-    if not os.path.exists(path):
-        print(f"[info] downloading popular package list -> {path}", flush=True)
-        urllib.request.urlretrieve(POPULAR_URL, path)
-    data = json.load(open(path))
-    names = [pep503(r["project"]) for r in data["rows"][:top]]
-    print(f"[info] popular list: top {len(names)} (updated {data.get('last_update')})")
-    return names
+def load_popular(popular_dir, top):
+    """Union of the top N of every snapshot in popular_dir; rank = best rank in any year."""
+    files = sorted(f for f in os.listdir(popular_dir) if f.endswith(".json"))
+    if not files:
+        raise SystemExit(f"no snapshots in {popular_dir}: run src/fetch_popular_snapshots.py first")
+    best = {}
+    for f in files:
+        data = json.load(open(os.path.join(popular_dir, f)))
+        for i, row in enumerate(data["rows"][:top]):
+            name = pep503(row["project"])
+            best[name] = min(best.get(name, 10**9), i + 1)
+        print(f"[info] {f}: top {min(top, len(data['rows']))} (updated {data.get('last_update')})")
+    names = sorted(best, key=lambda n: (best[n], n))
+    print(f"[info] union of popular names: {len(names)}")
+    return names, best
 
 
 def load_nodes(data_dir):
@@ -99,14 +108,12 @@ def main():
     ap = argparse.ArgumentParser(description="Label-blind typosquat edges to popular packages")
     ap.add_argument("--data-dir", default=DATA_DIR)
     ap.add_argument("--top", type=int, default=5000, help="number of popular packages used as targets")
-    ap.add_argument("--popular-file", default=None,
-                    help="local copy of top-pypi-packages.min.json (downloaded if missing)")
+    ap.add_argument("--popular-dir", default=None,
+                    help="folder with yearly snapshots (default: <data-dir>/popular)")
     args = ap.parse_args()
     data_dir = args.data_dir
-    popular_file = args.popular_file or f"{data_dir}/top-pypi-packages.min.json"
-
-    popular = load_popular(popular_file, args.top)
-    rank = {p: i + 1 for i, p in enumerate(popular)}
+    popular, best_rank = load_popular(args.popular_dir or f"{data_dir}/popular", args.top)
+    index = {p: i for i, p in enumerate(popular)}
     popular_set = set(popular)
     roles = load_nodes(data_dir)
     names = [n for n in roles.index if n]
@@ -121,15 +128,24 @@ def main():
     min_dist = {}
     nearest = {}
     chunk = 2000
-    for start in range(0, len(sources), chunk):
-        batch = sources[start:start + chunk]
+    # All names are compared (popular ones too, for the distance feature), but a
+    # popular name is compared with OTHER popular names only: otherwise its
+    # distance would be 0 by definition, and since removed malware can never be
+    # popular, "distance 0" would be a construction artifact. Edges are only
+    # created for non-popular sources.
+    for start in range(0, len(names), chunk):
+        batch = names[start:start + chunk]
         dist = cdist(batch, popular, scorer=DamerauLevenshtein.distance,
                      score_cutoff=3, dtype=np.int32, workers=-1)
         for i, name in enumerate(batch):
-            row = dist[i]
+            row = dist[i].copy()
+            if name in index:
+                row[index[name]] = 99  # ignore itself
             j = int(row.argmin())
             min_dist[name] = int(min(row[j], 3))
             nearest[name] = popular[j] if row[j] <= 3 else ""
+            if name in popular_set:
+                continue
             hits = np.where((row <= pop_max) & (row > 0))[0]
             for k in hits:
                 edges.append((name, popular[k], "edit", int(row[k])))
@@ -153,13 +169,13 @@ def main():
                 edges.append((name, name[:-len(suf)], "affix", 0))
 
     e = pd.DataFrame(edges, columns=["name", "target", "rule", "distance"]).drop_duplicates(["name", "target", "rule"])
-    e["target_rank"] = e["target"].map(rank)
+    e["target_rank"] = e["target"].map(best_rank)
     e.to_csv(f"{data_dir}/typosquat_edges.csv", index=False)
 
     # --- name features for every node ---
     feats = pd.DataFrame({"name": names})
     feats["is_popular"] = feats["name"].isin(popular_set).astype(int)
-    feats["min_dist_to_popular"] = feats["name"].map(min_dist).fillna(0).astype(int)
+    feats["min_dist_to_popular"] = feats["name"].map(min_dist).fillna(3).astype(int)
     feats["nearest_popular"] = feats["name"].map(nearest).fillna("")
     n_targets = e.groupby("name")["target"].nunique()
     feats["n_typosquat_targets"] = feats["name"].map(n_targets).fillna(0).astype(int)
@@ -181,7 +197,7 @@ def main():
     mal = set(feats.loc[feats["roles"].str.contains("malicious"), "name"])
     print("\nmost targeted popular packages (malicious sources):")
     for t, n in e[e["name"].isin(mal)]["target"].value_counts().head(15).items():
-        print(f"  {t:25s} {n:5d}   (rank {rank[t]})")
+        print(f"  {t:25s} {n:5d}   (best rank {best_rank[t]})")
     norm = set(feats.loc[feats["roles"].str.contains("normal"), "name"])
     ex = e[e["name"].isin(norm)].sample(min(10, int(e["name"].isin(norm).sum())), random_state=0)
     print("\nrandom examples among NORMAL packages (possible false positives):")
