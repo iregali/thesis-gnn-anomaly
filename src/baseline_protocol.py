@@ -30,6 +30,14 @@ Metrics (test set)
   - 95% confidence intervals by cluster bootstrap: normal packages resampled
     individually, malicious packages resampled BY FAMILY
 
+Normal-population check (only if normal_release_history.csv exists; see
+fetch_release_history.py). Test normal packages are split into first releases
+vs later releases, and into new (project <= 30 days old at the release) vs
+established projects. Per group: false-positive rate at the global 1% threshold,
+ROC-AUC with only that group as the normal class, and detection at 1% FPR with
+the threshold set on that group (= if that group were the deployed population).
+Release history is used to define populations only, never as a feature.
+
 Diagnostics (contamination analysis)
   - per-seed spread of family-weighted ROC-AUC and detection at 1% FPR
     (mean, std, min, max), and the per-seed values in the log
@@ -74,6 +82,8 @@ ID_COLS = ["Name", "Version", "path", "archive_type", "read_failed", "error", "t
 DROP_COLS = ["author_repo_defined"]  # duplicates has_source_repo
 GD_GROUPS = ["code_execution", "network_exfiltration", "obfuscation", "command_abuse", "sensitive_access"]
 DEP_COLS = ["n_core", "n_optional"]
+HISTORY_FILE = "normal_release_history.csv"
+NEW_PROJECT_DAYS = 30
 NAME_COLS = ["min_dist_to_popular", "n_typosquat_targets", "has_typosquat_edge"]
 
 PREPROCESSING = ["scale_all", "binary_raw"]
@@ -182,6 +192,48 @@ def point_metrics(s, y, w, hard, gd_fpr, flag=None):
     return m
 
 
+def normal_groups(feats, test_idx, y):
+    """Boolean masks over the test rows: subsets of the test NORMAL packages,
+    from the release history. Returns ({} , None) if the history is missing."""
+    path = f"{DATA_DIR}/{HISTORY_FILE}"
+    if not os.path.exists(path):
+        print(f"[info] {HISTORY_FILE} not found: normal-population check skipped")
+        return {}, None
+    h = pd.read_csv(path, dtype=str, keep_default_na=False)
+    h = h[h["status"] == "ok"].drop_duplicates("path").set_index("path")
+    paths = feats["path"].values[test_idx]
+    known = np.array([p in h.index for p in paths]) & (y == 0)
+    first_of = pd.to_numeric(h["is_first_release"]) == 1
+    first = np.array([bool(first_of.get(p, False)) for p in paths])
+    age = np.array([float(h.at[p, "project_age_days"]) if p in h.index else np.nan for p in paths])
+    groups = {"first": known & first, "later": known & ~first,
+              "new": known & (age <= NEW_PROJECT_DAYS), "estab": known & (age > NEW_PROJECT_DAYS)}
+    return groups, h
+
+
+def population_metrics(s, y, w, groups, flag=None):
+    """Per normal group: FPR at the global 1% threshold (or the rule's own flags),
+    ROC-AUC (fw) against that group only, detection (fw) at 1% FPR of that group."""
+    m = {}
+    if not groups:
+        return m
+    thr = np.quantile(s[y == 0], 0.99)
+    pos = y == 1
+    for g, gm in groups.items():
+        if gm.sum() < 20:
+            continue
+        keep = gm | pos
+        m[f"auc_fw_{g}"] = roc_auc_score(y[keep], s[keep], sample_weight=w[keep])
+        if flag is not None:
+            m[f"fpr_{g}"] = float(flag[gm].mean())
+        else:
+            m[f"fpr_{g}"] = float((s[gm] > thr).mean())
+            thr_g = np.quantile(s[gm], 0.99)
+            m[f"tpr1_fw_{g}"] = float(np.sum(w[pos] * (s[pos] > thr_g)) / np.sum(w[pos]))
+            m[f"prec_fw_{g}_1:65"] = precision_at(m[f"tpr1_fw_{g}"], 0.01, 65)
+    return m
+
+
 def bootstrap_ci(s, y, w, fam, n_boot, seed=0, flag=None):
     """95% CIs for family-weighted ROC-AUC and detection at 1% FPR (or GuardDog's
     own rate): normal packages resampled individually, malware BY FAMILY."""
@@ -263,6 +315,23 @@ def main():
           f"test {int((y == 0).sum())}+{int((y == 1).sum())} ({int(hard.sum())} GuardDog-hard, "
           f"{len(set(fam[y == 1]))} families)")
 
+    pop_groups, hist = normal_groups(feats, test_idx, y)
+    if hist is not None:
+        print("\n=== Normal population (release history) ===")
+        rows_c = []
+        for split in ["train", "val", "test"]:
+            idx = np.where((role == split) & (y_all == 0))[0]
+            hp = [p for p in feats["path"].values[idx] if p in hist.index]
+            sub = hist.loc[hp]
+            age = pd.to_numeric(sub["project_age_days"])
+            rows_c.append({"split": split, "normal": len(idx), "with_history": len(hp),
+                           "first_release": int((pd.to_numeric(sub["is_first_release"]) == 1).sum()),
+                           f"new_<={NEW_PROJECT_DAYS}d": int((age <= NEW_PROJECT_DAYS).sum()),
+                           "median_age_days": round(float(age.median()), 1)})
+        print(pd.DataFrame(rows_c).to_string(index=False))
+        print("test groups used: " + ", ".join(f"{g} {int(m.sum())}" for g, m in pop_groups.items()))
+        print("(1% FPR within a group is decided by ~1% of its size: treat groups < 1,000 as rough)\n")
+
     feature_sets = {
         "static+deps+names": groups["static"] + groups["deps"] + groups["names"],
         "static+deps+names+GuardDog": groups["static"] + groups["deps"] + groups["names"] + groups["guarddog"],
@@ -274,7 +343,8 @@ def main():
     gd_fpr = float(gd_flag[y == 0].mean())
     gd_score = feats["code_issue_count"].values[test_idx] + gd_flag
     r = {"level": "all", "method": "GuardDog rule", **point_metrics(gd_score, y, w, hard, gd_fpr, flag=gd_flag),
-         **bootstrap_ci(gd_score, y, w, fam, args.boot, flag=gd_flag)}
+         **bootstrap_ci(gd_score, y, w, fam, args.boot, flag=gd_flag),
+         **population_metrics(gd_score, y, w, pop_groups, flag=gd_flag)}
     rows.append(r)
     print(f"GuardDog: flags {r['tpr_gd']:.1%} of test malware, FPR {gd_fpr:.1%} | "
           f"family-weighted {r['tpr_gd_fw']:.1%} [{r['tpr_gd_fw_lo']:.1%}, {r['tpr_gd_fw_hi']:.1%}]")
@@ -336,7 +406,8 @@ def main():
                 s_ens = np.mean(seed_scores, axis=0)
                 name = f"{kind} ({set_name})"
                 row = {"level": level, "method": name, **point_metrics(s_ens, y, w, hard, gd_fpr),
-                       **bootstrap_ci(s_ens, y, w, fam, args.boot)}
+                       **bootstrap_ci(s_ens, y, w, fam, args.boot),
+                       **population_metrics(s_ens, y, w, pop_groups)}
                 per_seed = pd.DataFrame(seed_rows)
                 for col in ["auc_fw", "tpr1_fw", "tpr1_flagged_fw", "tpr1_hard_fw"]:
                     v = per_seed[col]
@@ -360,7 +431,8 @@ def main():
     rf.fit(feats[cols].fillna(0).values[fit_idx], y_all[fit_idx])
     s = rf.predict_proba(feats[cols].fillna(0).values[test_idx])[:, 1]
     rows.append({"level": "ref", "method": "RandomForest (supervised reference)",
-                 **point_metrics(s, y, w, hard, gd_fpr), **bootstrap_ci(s, y, w, fam, args.boot)})
+                 **point_metrics(s, y, w, hard, gd_fpr), **bootstrap_ci(s, y, w, fam, args.boot),
+                 **population_metrics(s, y, w, pop_groups)})
 
     results, chosen = pd.DataFrame(rows), pd.DataFrame(chosen)
     os.makedirs(RESULTS_DIR, exist_ok=True)
@@ -393,6 +465,15 @@ def main():
           ", ".join(f"{k} {precision_at(1.0, 0.01, n):.3f}" for k, n in BASE_RATES.items()))
     print("prec@ = package-level TPR, prec_fw@ = family-weighted TPR; GuardDog at its own FPR")
     print(results[["level", "method"] + prec].round(3).to_string(index=False))
+    if pop_groups:
+        print("\n=== Normal-population check (test normals split by release history) ===")
+        print("fpr_* = false-positive rate at the global 1% threshold (GuardDog: its own flags)")
+        print("auc_fw_* / tpr1_fw_* / prec_fw_* = that group alone as the normal population")
+        cols_p = ["level", "method"] + [c for g in pop_groups for c in
+                                        (f"fpr_{g}", f"auc_fw_{g}", f"tpr1_fw_{g}") if c in results.columns]
+        print(results[cols_p].round(3).to_string(index=False))
+        prec_p = [c for c in results.columns if c.startswith("prec_fw_") and c.endswith("_1:65")]
+        print(results[["level", "method", "prec_fw@1%FPR_per_project_1:65"] + prec_p].round(3).to_string(index=False))
     print(f"\nSaved to {RESULTS_DIR}/baseline_protocol_*.csv")
 
 
