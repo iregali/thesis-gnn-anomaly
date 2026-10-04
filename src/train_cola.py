@@ -29,6 +29,19 @@ Subgraph sampler (CoLA uses random walks with restart, mostly 1 hop)
   mean aggregation. Deviation from CoLA's code: induced edges among the
   sampled nodes are not used.
 
+Context-node features (--context-features)
+  none   as built: context nodes (dependency targets, never downloaded) have
+         zero archive features, only name features + is_context.
+  users  each context node's archive features = mean (scaled) archive features
+         of the TRAINING packages that depend on it ("what a typical user of
+         this dependency looks like"); name features and is_context unchanged;
+         context nodes without training users stay zero. Computed from the
+         training graph only (normal + unlabeled contamination), label-blind.
+         Leave-one-out during training: when a training package is the anchor,
+         every context node it depends on is shown WITHOUT its own contribution
+         (otherwise the anchor's hidden features would leak into its own
+         neighbourhood). Held-out packages are not users, so nothing to remove.
+
 Scoring held-out packages (Methodology §13: inserted, never in training)
   All validation and test packages are inserted at once, but WITHOUT links to
   each other: each gets its edges to training-graph nodes, its own private
@@ -66,7 +79,7 @@ sys.path.insert(0, os.path.dirname(__file__))
 from baseline_protocol import (DATA_DIR, EXTRA_FPRS, RESULTS_DIR, SELECT_MAX_FPR, SPLIT_FILE,  # noqa: E402
                                bootstrap_ci, combine, load_features, normal_groups,
                                point_metrics, population_metrics, subgroup_metrics, to_ranks)
-from build_graph import load_bundle  # noqa: E402
+from build_graph import NAME_FEATURES, load_bundle  # noqa: E402
 from connectivity import PeerIndex, connectivity_table, load_core_deps  # noqa: E402
 from losses import BilinearDiscriminator  # noqa: E402
 
@@ -81,7 +94,7 @@ DIM = 64
 # Graph with held-out packages attached (no links between held-out packages)
 # ---------------------------------------------------------------------------
 class ScoringGraph:
-    def __init__(self, bundle):
+    def __init__(self, bundle, context_features="none"):
         g = bundle["graph"]
         n0 = g.num_nodes
         ei = g.edge_index.numpy()
@@ -115,9 +128,58 @@ class ScoringGraph:
         x_extra = np.stack(x_rows) if x_rows else np.zeros((0, g.x.shape[1]), dtype=np.float32)
         self.x = torch.cat([g.x, bundle["x_heldout"].float(), torch.from_numpy(x_extra).float()])
         self.n_train, self.n_held = n0, nh
+        self.loo_keys = None
+        if context_features == "users":
+            self._user_features(bundle, g)
         self.train_anchors = np.where(~g.is_context.numpy())[0]       # evaluated training packages
         self.held_node = n0 + np.arange(nh)
         self.held_paths = h["path"].values
+
+    def _user_features(self, bundle, g):
+        """Context nodes get the mean archive features of their training users."""
+        fn = bundle["feature_names"]
+        self.archive = torch.tensor([i for i, f in enumerate(fn) if f not in NAME_FEATURES + ["is_context"]])
+        src, dst = g.dep_edge_index.numpy()
+        ctx = g.is_context.numpy()
+        keep = ctx[dst]                               # edges into context nodes; sources are training packages
+        src, dst = src[keep], dst[keep]
+        N = self.x.shape[0]
+        self.ctx_sum = torch.zeros(N, len(self.archive))
+        self.ctx_n = torch.zeros(N)
+        xa = self.x[:, self.archive]
+        self.ctx_sum.index_add_(0, torch.from_numpy(dst), xa[torch.from_numpy(src)])
+        self.ctx_n.index_add_(0, torch.from_numpy(dst), torch.ones(len(dst)))
+        has = self.ctx_n > 0
+        x = self.x.clone()
+        x[has.nonzero().squeeze(1)[:, None], self.archive] = self.ctx_sum[has] / self.ctx_n[has, None]
+        self.x = x
+        self.loo_keys = np.unique(src.astype(np.int64) * N + dst.astype(np.int64))
+        self.x0_archive = xa                          # training packages' own (unchanged) archive features
+        print(f"  context features from users: {int(has.sum())} of {int(ctx.sum())} context nodes "
+              f"(median {int(self.ctx_n[has].median())} users)", flush=True)
+
+    def leave_one_out(self, X, nodes):
+        """For training anchors: remove the anchor's own contribution from the
+        context nodes it depends on. X [B, S, F] gathered rows (modified in place)."""
+        if self.loo_keys is None:
+            return X
+        N = self.x.shape[0]
+        anchors = nodes[:, :1]
+        keys = anchors * N + nodes
+        hit = np.isin(keys, self.loo_keys)
+        hit[:, 0] = False
+        if not hit.any():
+            return X
+        b, j = np.nonzero(hit)
+        c = torch.from_numpy(nodes[b, j])
+        a = torch.from_numpy(nodes[b, 0])
+        n = self.ctx_n[c]
+        own = self.x0_archive[a]
+        loo = (self.ctx_sum[c] - own) / torch.clamp(n - 1, min=1)[:, None]
+        loo[n <= 1] = 0.0
+        bt, jt = torch.from_numpy(b), torch.from_numpy(j)
+        X[bt[:, None], jt[:, None], self.archive[None, :]] = loo
+        return X
 
     def degree(self, v):
         return self.indptr[v + 1] - self.indptr[v]
@@ -178,8 +240,10 @@ class CoLA(nn.Module):
         return pos, neg
 
 
-def batch_tensors(graph, nodes, pad, device):
+def batch_tensors(graph, nodes, pad, device, training=False):
     X = graph.x[torch.from_numpy(nodes)].clone()
+    if training:
+        X = graph.leave_one_out(X, nodes)
     X[:, 0] = 0.0                                  # anonymise the target
     X[torch.from_numpy(pad)] = 0.0                 # padding for missing neighbours
     return X.to(device), graph.x[torch.from_numpy(nodes[:, 0])].to(device)
@@ -199,7 +263,7 @@ def train(graph, p2, seed, epochs, batch, lr, device):
             if len(b) < 2:
                 continue
             nodes, pad = graph.sample(b, p2, rng)
-            X, xt = batch_tensors(graph, nodes, pad, device)
+            X, xt = batch_tensors(graph, nodes, pad, device, training=True)
             pos, neg = model(X, xt)
             loss = (F.binary_cross_entropy_with_logits(pos, torch.ones_like(pos)) +
                     F.binary_cross_entropy_with_logits(neg, torch.zeros_like(neg)))
@@ -248,6 +312,7 @@ def main():
     ap.add_argument("--rounds", type=int, default=64, help="sampling rounds when scoring")
     ap.add_argument("--boot", type=int, default=500)
     ap.add_argument("--tag", default="")
+    ap.add_argument("--context-features", default="none", choices=["none", "users"])
     args = ap.parse_args()
     args.levels = sorted(args.levels)
     device = "cuda" if torch.cuda.is_available() else "cpu"
@@ -309,7 +374,7 @@ def main():
             if path not in graphs:
                 t0 = time.time()
                 b = load_bundle(path)
-                graphs[path] = (ScoringGraph(b), b)
+                graphs[path] = (ScoringGraph(b, args.context_features), b)
                 print(f"[level {level:.0%}] loaded {os.path.basename(path)} ({time.time() - t0:.0f}s)", flush=True)
             graph, b = graphs[path]
             held_pos = {p: i for i, p in enumerate(graph.held_paths)}

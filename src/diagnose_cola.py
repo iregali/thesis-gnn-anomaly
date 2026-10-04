@@ -99,10 +99,10 @@ def inject(graph, targets, donors_pool, rng, mode):
     return x
 
 
-def part_b(epochs, rounds, device):
-    print("\n=== B. Contextual-anomaly injection on the real clean graph ===")
+def part_b(epochs, rounds, device, context_features):
+    print(f"\n=== B. Contextual-anomaly injection on the real clean graph (context features: {context_features}) ===")
     b = load_bundle(f"{DATA_DIR}/graph_c00_s0.pt")
-    graph = ScoringGraph(b)
+    graph = ScoringGraph(b, context_features)
     conn = pd.read_csv(f"{DATA_DIR}/heldout_connectivity.csv", dtype={"path": str})
     pos = {p: i for i, p in enumerate(graph.held_paths)}
     held = conn[conn["path"].isin(pos)].copy()
@@ -148,12 +148,13 @@ def main():
     ap.add_argument("--skip-injection", action="store_true")
     ap.add_argument("--epochs", type=int, default=100)
     ap.add_argument("--rounds", type=int, default=64)
+    ap.add_argument("--context-features", default="none", choices=["none", "users"])
     args = ap.parse_args()
     part_a(args.tag)
     if not args.skip_injection:
         device = "cuda" if torch.cuda.is_available() else "cpu"
         print(f"\ndevice {device}")
-        part_b(args.epochs, args.rounds, device)
+        part_b(args.epochs, args.rounds, device, args.context_features)
 
 
 if __name__ == "__main__":
