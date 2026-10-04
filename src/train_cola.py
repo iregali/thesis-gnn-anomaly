@@ -34,8 +34,12 @@ Context-node features (--context-features)
          zero archive features, only name features + is_context.
   users  each context node's archive features = mean (scaled) archive features
          of the TRAINING packages that depend on it ("what a typical user of
-         this dependency looks like"); name features and is_context unchanged;
-         context nodes without training users stay zero. Computed from the
+         this dependency looks like"); name features and is_context unchanged.
+         Only context nodes with at least --context-min-users training users
+         (default 3) get a profile; the rest stay zero, identically in training
+         and scoring. (With one user, leave-one-out would empty the profile in
+         training while held-out packages would see it: a train/score mismatch.
+         With k users, an anchor always sees at least k - 1 others.) Computed from the
          training graph only (normal + unlabeled contamination), label-blind.
          Leave-one-out during training: when a training package is the anchor,
          every context node it depends on is shown WITHOUT its own contribution
@@ -94,7 +98,7 @@ DIM = 64
 # Graph with held-out packages attached (no links between held-out packages)
 # ---------------------------------------------------------------------------
 class ScoringGraph:
-    def __init__(self, bundle, context_features="none"):
+    def __init__(self, bundle, context_features="none", min_users=3):
         g = bundle["graph"]
         n0 = g.num_nodes
         ei = g.edge_index.numpy()
@@ -130,12 +134,12 @@ class ScoringGraph:
         self.n_train, self.n_held = n0, nh
         self.loo_keys = None
         if context_features == "users":
-            self._user_features(bundle, g)
+            self._user_features(bundle, g, min_users)
         self.train_anchors = np.where(~g.is_context.numpy())[0]       # evaluated training packages
         self.held_node = n0 + np.arange(nh)
         self.held_paths = h["path"].values
 
-    def _user_features(self, bundle, g):
+    def _user_features(self, bundle, g, min_users):
         """Context nodes get the mean archive features of their training users."""
         fn = bundle["feature_names"]
         self.archive = torch.tensor([i for i, f in enumerate(fn) if f not in NAME_FEATURES + ["is_context"]])
@@ -149,14 +153,17 @@ class ScoringGraph:
         xa = self.x[:, self.archive]
         self.ctx_sum.index_add_(0, torch.from_numpy(dst), xa[torch.from_numpy(src)])
         self.ctx_n.index_add_(0, torch.from_numpy(dst), torch.ones(len(dst)))
-        has = self.ctx_n > 0
+        has = self.ctx_n >= max(min_users, 1)
         x = self.x.clone()
         x[has.nonzero().squeeze(1)[:, None], self.archive] = self.ctx_sum[has] / self.ctx_n[has, None]
         self.x = x
-        self.loo_keys = np.unique(src.astype(np.int64) * N + dst.astype(np.int64))
+        prof = has.numpy()[dst]                       # leave-one-out only where a profile is shown
+        self.loo_keys = np.unique(src[prof].astype(np.int64) * N + dst[prof].astype(np.int64))
         self.x0_archive = xa                          # training packages' own (unchanged) archive features
-        print(f"  context features from users: {int(has.sum())} of {int(ctx.sum())} context nodes "
-              f"(median {int(self.ctx_n[has].median())} users)", flush=True)
+        n_ctx = int(ctx.sum())
+        print(f"  context features from users (min {min_users}): {int(has.sum())} of {n_ctx} context nodes "
+              f"have a profile (median {int(self.ctx_n[has].median()) if has.any() else 0} users); they carry "
+              f"{prof.mean():.1%} of the training dependency edges into context nodes", flush=True)
 
     def leave_one_out(self, X, nodes):
         """For training anchors: remove the anchor's own contribution from the
@@ -313,6 +320,7 @@ def main():
     ap.add_argument("--boot", type=int, default=500)
     ap.add_argument("--tag", default="")
     ap.add_argument("--context-features", default="none", choices=["none", "users"])
+    ap.add_argument("--context-min-users", type=int, default=3)
     args = ap.parse_args()
     args.levels = sorted(args.levels)
     device = "cuda" if torch.cuda.is_available() else "cpu"
@@ -374,7 +382,7 @@ def main():
             if path not in graphs:
                 t0 = time.time()
                 b = load_bundle(path)
-                graphs[path] = (ScoringGraph(b, args.context_features), b)
+                graphs[path] = (ScoringGraph(b, args.context_features, args.context_min_users), b)
                 print(f"[level {level:.0%}] loaded {os.path.basename(path)} ({time.time() - t0:.0f}s)", flush=True)
             graph, b = graphs[path]
             held_pos = {p: i for i, p in enumerate(graph.held_paths)}
