@@ -59,6 +59,24 @@ Variants (--variants; rows of the naive variant are identical to earlier runs)
           (separates "contamination damages model selection" from "contamination
           damages the model"); only reported for levels > 0.
 
+Connectivity subgroups (connectivity.py; label-blind, relative to the training
+normal packages): connected (any dependency edge after insertion) vs isolated,
+and has_peers (shares a dependency with, or depends on / is depended on by, a
+training package) vs no_peers. Every detector is also reported per subgroup:
+ROC-AUC, detection at 1% FPR with the threshold set within the subgroup, and
+detection of the subgroup's malware at the GLOBAL 1% threshold.
+
+PEER detector (dependency-peer deviation, no training): mean distance from a
+package's features to its k nearest peers among the training packages (packages
+sharing a dependency or directly linked). Defined only for packages with peers;
+preprocessing and k chosen on validation (packages with peers).
+Combined rows (same feature set and level, naive):
+  "OCSVM (subgroup-calibrated)"  OCSVM scores turned into tail probabilities
+                                 against validation normals of the same subgroup
+                                 (with / without peers): control for calibration
+  "PEER -> OCSVM"                PEER for packages with peers, OCSVM otherwise,
+                                 both calibrated the same way
+
 Ablation (--feature-sets): static | static+GuardDog | static+deps+names |
 static+deps+names+GuardDog (default: the last two, as before).
 
@@ -89,6 +107,7 @@ from sklearn.preprocessing import StandardScaler
 from sklearn.svm import OneClassSVM
 
 from build_graph import draw_contamination
+from connectivity import PeerIndex, connectivity_table, load_core_deps
 
 DATA_DIR = "/home/igalimi1/thesis/data"
 RESULTS_DIR = "/home/igalimi1/thesis/results"
@@ -112,6 +131,7 @@ PREPROCESSING = ["scale_all", "binary_raw"]
 PREPROCESSING_ROBUST = PREPROCESSING + ["robust"]
 TRIM_FRACTIONS = [0.0, 0.01, 0.02, 0.05]  # share of training packages dropped before refitting
 EXTRA_FPRS = {"tpr05_fw": 0.005, "tpr2_fw": 0.02}  # extra operating points (family-weighted)
+PEER_K = [5, 20, 50]  # peers averaged by the PEER detector
 OCSVM_NU = [0.01, 0.05, 0.1]
 OCSVM_GAMMA = [0.1, 1.0, 10.0]  # times 1 / n_features
 LOF_NEIGHBORS = [10, 35, 100]
@@ -273,6 +293,84 @@ def population_metrics(s, y, w, groups, flag=None):
     return m
 
 
+def subgroup_metrics(s, y, w, sg, flag=None):
+    """Per label-blind subgroup mask (both classes): ROC-AUC (fw), detection at 1%
+    FPR with the threshold set inside the subgroup, and detection / FPR of the
+    subgroup at the GLOBAL 1% threshold (what a single deployed threshold does)."""
+    m_out = {}
+    thr = np.quantile(s[y == 0], 0.99)
+    for g, m in sg.items():
+        neg, pos = m & (y == 0), m & (y == 1)
+        if neg.sum() < 50 or pos.sum() < 20:
+            continue
+        m_out[f"sg_auc_fw_{g}"] = roc_auc_score(y[m], s[m], sample_weight=w[m])
+        if flag is not None:
+            m_out[f"sg_tpr_fw_{g}"] = float(np.sum(w[pos] * flag[pos]) / np.sum(w[pos]))
+            m_out[f"sg_fpr_{g}"] = float(flag[neg].mean())
+            continue
+        thr_g = np.quantile(s[neg], 0.99)
+        m_out[f"sg_tpr1_fw_{g}"] = float(np.sum(w[pos] * (s[pos] > thr_g)) / np.sum(w[pos]))
+        m_out[f"sg_tpr1glob_fw_{g}"] = float(np.sum(w[pos] * (s[pos] > thr)) / np.sum(w[pos]))
+        m_out[f"sg_fpr1glob_{g}"] = float((s[neg] > thr).mean())
+    return m_out
+
+
+def peer_distances(Xm, fit_idx, q_idx, P, kmax, chunk=512):
+    """Sorted distances [len(q_idx), kmax] from each query package to its nearest
+    peers among fit_idx (P: sparse peer matrix, > 0 = peer); inf where fewer."""
+    F = Xm[fit_idx].astype(np.float64)
+    f2 = (F ** 2).sum(axis=1)
+    out = np.full((len(q_idx), kmax), np.inf)
+    for a in range(0, len(q_idx), chunk):
+        Q = Xm[q_idx[a:a + chunk]].astype(np.float64)
+        D = np.sqrt(np.clip((Q ** 2).sum(axis=1)[:, None] + f2[None, :] - 2 * Q @ F.T, 0, None))
+        D[~(P[a:a + chunk].toarray() > 0)] = np.inf
+        kk = min(kmax, D.shape[1])
+        part = np.sort(np.partition(D, kk - 1, axis=1)[:, :kk], axis=1)
+        out[a:a + len(Q), :kk] = part
+    return out
+
+
+def peer_score(sorted_d, k):
+    """Mean distance to the k nearest peers (fewer if fewer exist); NaN without peers."""
+    d = sorted_d[:, :k]
+    fin = np.isfinite(d)
+    n = fin.sum(axis=1)
+    return np.where(n > 0, np.where(fin, d, 0.0).sum(axis=1) / np.maximum(n, 1), np.nan)
+
+
+def fill_missing(s):
+    """Packages a detector cannot score (NaN) are never flagged: below every score."""
+    s = s.copy()
+    s[np.isnan(s)] = np.nanmin(s) - 1.0 if np.isfinite(s).any() else 0.0
+    return s
+
+
+def calibrated(ref, s, p_floor):
+    """Tail probability of s against reference normal scores, as -log p, plus a tiny
+    within-reference z term so packages beyond every reference score stay ordered.
+    p is floored at p_floor (the same for every subgroup), otherwise the subgroup
+    with more reference normals could reach smaller p-values and win every tie."""
+    ref = np.sort(ref)
+    n_ge = len(ref) - np.searchsorted(ref, s, side="left")
+    p = np.maximum((1.0 + n_ge) / (1.0 + len(ref)), p_floor)
+    med = np.median(ref)
+    spread = max(np.quantile(ref, 0.99) - med, 1e-12)
+    return -np.log(p) + 1e-3 * np.clip((s - med) / spread, -1e3, 1e3)
+
+
+def combine(a_val, a_test, b_val, b_test, y_val):
+    """Score a where it is defined (not NaN), b elsewhere; each calibrated against
+    validation normals of its own subgroup (defined / not defined for a)."""
+    gv, gt = ~np.isnan(a_val), ~np.isnan(a_test)
+    ref_a, ref_b = a_val[gv & (y_val == 0)], b_val[~gv & (y_val == 0)]
+    p_floor = 1.0 / (1.0 + min(len(ref_a), len(ref_b)))
+    out = np.empty(len(a_test))
+    out[gt] = calibrated(ref_a, a_test[gt], p_floor)
+    out[~gt] = calibrated(ref_b, b_test[~gt], p_floor)
+    return out
+
+
 def bootstrap_ci(s, y, w, fam, n_boot, seed=0, flag=None):
     """95% CIs for family-weighted ROC-AUC and detection at 1% FPR (or GuardDog's
     own rate): normal packages resampled individually, malware BY FAMILY."""
@@ -361,6 +459,8 @@ def main():
                     choices=["static", "static+GuardDog", "static+deps+names", "static+deps+names+GuardDog"])
     ap.add_argument("--normal-salt", default=None, help="reassign normal packages with this salt")
     ap.add_argument("--tag", default=None, help="suffix for the output files")
+    ap.add_argument("--detectors", nargs="*", default=["IF", "LOF", "OCSVM", "PEER"],
+                    choices=["IF", "LOF", "OCSVM", "PEER"])
     args = ap.parse_args()
     args.levels = sorted(args.levels)
     if "fixed" in args.variants and (0.0 not in args.levels or "naive" not in args.variants):
@@ -398,6 +498,19 @@ def main():
           f"{len(set(fam[y == 1]))} families)")
 
     pop_groups, hist = normal_groups(feats, test_idx, y)
+
+    deps_of = load_core_deps(DATA_DIR)
+    conn = connectivity_table(feats, train_idx, test_idx, deps_of)
+    sg = {"conn": conn["connected"].values, "iso": ~conn["connected"].values,
+          "peers": conn["has_peers"].values, "nopeers": ~conn["has_peers"].values}
+    print("\n=== Connectivity subgroups (test; relative to training normals) ===")
+    rows_sg = []
+    for g, m in sg.items():
+        rows_sg.append({"group": g, "normal": int((m & (y == 0)).sum()), "malicious": int((m & (y == 1)).sum()),
+                        "families": len(set(fam[m & (y == 1)])),
+                        "share_of_malware_fw": round(float(w[m & (y == 1)].sum() / w[y == 1].sum()), 3)})
+    print(pd.DataFrame(rows_sg).to_string(index=False))
+    print(f"median peers, connected test packages: {conn.loc[conn['connected'], 'n_peers'].median():.0f}\n")
     if hist is not None:
         print("\n=== Normal population (release history) ===")
         rows_c = []
@@ -429,7 +542,8 @@ def main():
     gd_score = feats["code_issue_count"].values[test_idx] + gd_flag
     r = {"level": "all", "method": "GuardDog rule", **point_metrics(gd_score, y, w, hard, gd_fpr, flag=gd_flag),
          **bootstrap_ci(gd_score, y, w, fam, args.boot, flag=gd_flag),
-         **population_metrics(gd_score, y, w, pop_groups, flag=gd_flag)}
+         **population_metrics(gd_score, y, w, pop_groups, flag=gd_flag),
+         **subgroup_metrics(gd_score, y, w, sg, flag=gd_flag)}
     rows.append(r)
     print(f"GuardDog: flags {r['tpr_gd']:.1%} of test malware, FPR {gd_fpr:.1%} | "
           f"family-weighted {r['tpr_gd_fw']:.1%} [{r['tpr_gd_fw_lo']:.1%}, {r['tpr_gd_fw_hi']:.1%}]")
@@ -457,15 +571,26 @@ def main():
     naive_at_0 = {}  # (feature set, detector) -> naive setting chosen at level 0 (for the fixed variant)
     labels = {"naive": "", "robust": "+robust", "fixed": " [0% settings]"}
 
+    store = {}        # (level, set, kind, variant) -> per-seed (val scores, test scores)
+    peer_cache = {}   # (level, seed) -> sparse peer matrices for validation and test
+
+    def peers_for(level, seed, fit_idx):
+        if (level, seed) not in peer_cache:
+            idx = PeerIndex(feats["path"].values[fit_idx], feats["Name"].values[fit_idx], deps_of)
+            peer_cache[(level, seed)] = {
+                which: idx.query(feats["path"].values[q], feats["Name"].values[q], deps_of)
+                for which, q in [("val", val_idx), ("test", test_idx)]}
+        return peer_cache[(level, seed)]
+
     def run(level, set_name, X_raw, kind, variant):
-        """Choose settings on validation (seed 0), score test for every seed, return the row."""
+        """Choose settings on validation (seed 0), score val + test for every seed, return the row."""
         setting = naive_at_0[(set_name, kind)] if variant == "fixed" else None
-        val_pauc, seed_scores, seed_rows = np.nan, [], []
+        val_pauc, seed_scores, seed_rows, seed_store = np.nan, [], [], []
         for seed in args.seeds:
             drawn = draw_contamination(pool_paths, level, len(train_idx), seed) if level > 0 else []
             contam = [path_to_idx[p] for p in drawn]
             fit_idx = np.concatenate([train_idx, np.array(contam, dtype=int)])
-            preps = {}
+            preps, dists = {}, {}
 
             def X_for(mode):
                 if mode == "raw":
@@ -474,32 +599,59 @@ def main():
                     preps[mode] = preprocess(X_raw, fit_idx, mode)
                 return preps[mode]
 
+            def peer_scores(cand, which):
+                key = (cand["mode"], which)
+                if key not in dists:
+                    P = peers_for(level, seed, fit_idx)[which]
+                    q = val_idx if which == "val" else test_idx
+                    dists[key] = peer_distances(X_for(cand["mode"]), fit_idx, q, P, max(PEER_K))
+                return peer_score(dists[key], cand["k"])
+
             if setting is None:  # choose on validation with the first seed
                 best, bases = None, {}
-                for cand in candidates(kind, robust=(variant == "robust")):
-                    Xm = X_for(cand["mode"])
-                    key = setting_key(cand)
-                    if key not in bases:
-                        bases[key] = fit_model(kind, {**cand, "trim": 0.0}, Xm[fit_idx], seed)
-                    mdl = fit_model(kind, cand, Xm[fit_idx], seed, base=bases[key])
-                    sc = roc_auc_score(y_val, -mdl.decision_function(Xm[val_idx]), max_fpr=SELECT_MAX_FPR)
+                cands = ([{"mode": m, "k": k} for m in PREPROCESSING_ROBUST for k in PEER_K] if kind == "PEER"
+                         else candidates(kind, robust=(variant == "robust")))
+                for cand in cands:
+                    if kind == "PEER":
+                        sv = peer_scores(cand, "val")
+                        ok = ~np.isnan(sv)
+                        sc = roc_auc_score(y_val[ok], sv[ok], max_fpr=SELECT_MAX_FPR)
+                    else:
+                        Xm = X_for(cand["mode"])
+                        key = setting_key(cand)
+                        if key not in bases:
+                            bases[key] = fit_model(kind, {**cand, "trim": 0.0}, Xm[fit_idx], seed)
+                        mdl = fit_model(kind, cand, Xm[fit_idx], seed, base=bases[key])
+                        sc = roc_auc_score(y_val, -mdl.decision_function(Xm[val_idx]), max_fpr=SELECT_MAX_FPR)
                     if best is None or sc > best[0]:
                         best = (sc, cand)
                 val_pauc, setting = best
-            Xm = X_for(setting["mode"])
-            s = fit_score(kind, setting, Xm[fit_idx], Xm[test_idx], seed)
-            seed_scores.append(to_ranks(s))
-            seed_rows.append(point_metrics(s, y, w, hard, gd_fpr))
+            if kind == "PEER":
+                sv, s = peer_scores(setting, "val"), peer_scores(setting, "test")
+            else:
+                Xm = X_for(setting["mode"])
+                mdl = fit_model(kind, setting, Xm[fit_idx], seed)
+                sv, s = -mdl.decision_function(Xm[val_idx]), -mdl.decision_function(Xm[test_idx])
+            seed_store.append((sv, s))
+            s_f = fill_missing(s)
+            seed_scores.append(to_ranks(s_f))
+            seed_rows.append(point_metrics(s_f, y, w, hard, gd_fpr))
 
+        store[(level, set_name, kind, variant)] = seed_store
         chosen.append({"level": level, "features": set_name, "method": kind, "variant": variant,
                        "setting": str(setting), "val_pauc": val_pauc})
         if variant == "naive" and level == 0:
             naive_at_0[(set_name, kind)] = setting
-        s_ens = np.mean(seed_scores, axis=0)
         name = f"{kind}{labels[variant]} ({set_name})"
+        if kind == "PEER":
+            name = f"PEER ({set_name}; packages with peers only)"
+        return summarise(level, name, variant, set_name, kind, seed_scores, seed_rows, setting)
+
+    def summarise(level, name, variant, set_name, kind, seed_scores, seed_rows, setting):
+        s_ens = np.mean(seed_scores, axis=0)
         row = {"level": level, "method": name, "variant": variant, "features": set_name, "detector": kind,
                **point_metrics(s_ens, y, w, hard, gd_fpr), **bootstrap_ci(s_ens, y, w, fam, args.boot),
-               **population_metrics(s_ens, y, w, pop_groups)}
+               **population_metrics(s_ens, y, w, pop_groups), **subgroup_metrics(s_ens, y, w, sg)}
         per_seed = pd.DataFrame(seed_rows)
         for col in ["auc_fw", "tpr1_fw", "tpr1_flagged_fw", "tpr1_hard_fw", *EXTRA_FPRS]:
             v = per_seed[col]
@@ -510,7 +662,8 @@ def main():
         print(f"level {level:.0%} | {name:52s} ROC-AUC (fw) {row['auc_fw']:.3f} "
               f"[{row['auc_fw_lo']:.3f}, {row['auc_fw_hi']:.3f}] | caught@1%FPR (fw) "
               f"{row['tpr1_fw']:.1%} [{row['tpr_fw_lo']:.1%}, {row['tpr_fw_hi']:.1%}] | "
-              f"flagged {row['tpr1_flagged_fw']:.1%}, hard {row['tpr1_hard_fw']:.1%}", flush=True)
+              f"connected: AUC {row.get('sg_auc_fw_conn', np.nan):.3f}, "
+              f"caught {row.get('sg_tpr1_fw_conn', np.nan):.1%}", flush=True)
         print(f"    per seed: caught@1%FPR (fw) "
               f"{', '.join(f'{v:.1%}' for v in per_seed['tpr1_fw'])} | ROC-AUC (fw) "
               f"{', '.join(f'{v:.3f}' for v in per_seed['auc_fw'])} | setting {setting}", flush=True)
@@ -519,11 +672,26 @@ def main():
     for level in args.levels:
         for set_name, cols in feature_sets.items():
             X_raw = feats[cols].fillna(0).values.astype(float)
-            for kind in ["IF", "LOF", "OCSVM"]:
+            for kind in args.detectors:
                 for variant in ["naive", "robust", "fixed"]:
                     if variant not in args.variants or (variant == "fixed" and level == 0):
                         continue
+                    if kind == "PEER" and variant != "naive":
+                        continue
                     rows.append(run(level, set_name, X_raw, kind, variant))
+            # combined rows: calibration control, and PEER for packages with peers + OCSVM otherwise
+            a, b = store.get((level, set_name, "PEER", "naive")), store.get((level, set_name, "OCSVM", "naive"))
+            if a is not None and b is not None:
+                for name, first in [("OCSVM (subgroup-calibrated)", "ocsvm"), ("PEER -> OCSVM", "peer")]:
+                    seed_scores, seed_rows = [], []
+                    for (pv, pt), (ov, ot) in zip(a, b):
+                        av = np.where(np.isnan(pv), np.nan, ov) if first == "ocsvm" else pv
+                        at = np.where(np.isnan(pt), np.nan, ot) if first == "ocsvm" else pt
+                        sc = combine(av, at, ov, ot, y_val)
+                        seed_scores.append(to_ranks(sc))
+                        seed_rows.append(point_metrics(sc, y, w, hard, gd_fpr))
+                    rows.append(summarise(level, f"{name} ({set_name})", "combined", set_name, name,
+                                          seed_scores, seed_rows, "calibrated on validation normals per subgroup"))
 
     # Supervised reference: trained on training normals + the whole contamination pool (labelled)
     cols = all_sets["static+deps+names+GuardDog"]
@@ -533,7 +701,7 @@ def main():
     s = rf.predict_proba(feats[cols].fillna(0).values[test_idx])[:, 1]
     rows.append({"level": "ref", "method": "RandomForest (supervised reference)",
                  **point_metrics(s, y, w, hard, gd_fpr), **bootstrap_ci(s, y, w, fam, args.boot),
-                 **population_metrics(s, y, w, pop_groups)})
+                 **population_metrics(s, y, w, pop_groups), **subgroup_metrics(s, y, w, sg)})
 
     results, chosen = pd.DataFrame(rows), pd.DataFrame(chosen)
     os.makedirs(RESULTS_DIR, exist_ok=True)
@@ -588,6 +756,12 @@ def main():
             print(f"\n{metric}")
             print(piv.round(3).to_string())
 
+    sg_cols = [c for g in ["conn", "iso", "peers"] for c in
+               (f"sg_auc_fw_{g}", f"sg_tpr1_fw_{g}", f"sg_tpr1glob_fw_{g}") if c in results.columns]
+    if sg_cols:
+        print("\n=== Connectivity subgroups: ROC-AUC fw | caught @ 1% FPR within subgroup | "
+              "caught at the global 1% threshold ===")
+        print(results[["level", "method"] + sg_cols].round(3).to_string(index=False))
     print(f"\nSaved to {RESULTS_DIR}/baseline_protocol_*{tag}.csv")
 
 
