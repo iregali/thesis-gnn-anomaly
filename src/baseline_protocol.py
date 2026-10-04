@@ -77,6 +77,13 @@ Combined rows (same feature set and level, naive):
   "PEER -> OCSVM"                PEER for packages with peers, OCSVM otherwise,
                                  both calibrated the same way
 
+Per-subgroup models (--variants split): one detector fitted on the training
+packages WITH dependency peers and one on those WITHOUT (peers relative to the
+training data itself, leave-one-out); each scores the held-out packages of its
+own subgroup, settings chosen on validation within the subgroup; the two scores
+are combined with the same per-subgroup calibration as above. The contamination
+share inside each subgroup is printed (contamination is mostly isolated malware).
+
 Ablation (--feature-sets): static | static+GuardDog | static+deps+names |
 static+deps+names+GuardDog (default: the last two, as before).
 
@@ -454,7 +461,7 @@ def main():
     ap.add_argument("--levels", type=float, nargs="*", default=LEVELS)
     ap.add_argument("--seeds", type=int, nargs="*", default=SEEDS)
     ap.add_argument("--boot", type=int, default=500)
-    ap.add_argument("--variants", nargs="*", default=["naive"], choices=["naive", "robust", "fixed"])
+    ap.add_argument("--variants", nargs="*", default=["naive"], choices=["naive", "robust", "fixed", "split"])
     ap.add_argument("--feature-sets", nargs="*", default=["static+deps+names", "static+deps+names+GuardDog"],
                     choices=["static", "static+GuardDog", "static+deps+names", "static+deps+names+GuardDog"])
     ap.add_argument("--normal-salt", default=None, help="reassign normal packages with this salt")
@@ -569,7 +576,7 @@ def main():
         print(f"(whole pool: {len(pool_paths)} packages, GuardDog-flagged share {pool_flag:.3f})\n")
 
     naive_at_0 = {}  # (feature set, detector) -> naive setting chosen at level 0 (for the fixed variant)
-    labels = {"naive": "", "robust": "+robust", "fixed": " [0% settings]"}
+    labels = {"naive": "", "robust": "+robust", "fixed": " [0% settings]", "split": " per subgroup"}
 
     store = {}        # (level, set, kind, variant) -> per-seed (val scores, test scores)
     peer_cache = {}   # (level, seed) -> sparse peer matrices for validation and test
@@ -647,6 +654,57 @@ def main():
             name = f"PEER ({set_name}; packages with peers only)"
         return summarise(level, name, variant, set_name, kind, seed_scores, seed_rows, setting)
 
+    def run_split(level, set_name, X_raw, kind):
+        """One detector per subgroup (with / without dependency peers), calibrated and combined."""
+        settings = {}
+        seed_scores, seed_rows = [], []
+        for seed in args.seeds:
+            drawn = draw_contamination(pool_paths, level, len(train_idx), seed) if level > 0 else []
+            contam = [path_to_idx[p] for p in drawn]
+            fit_idx = np.concatenate([train_idx, np.array(contam, dtype=int)])
+            is_contam = np.isin(fit_idx, contam)
+            fit_has = connectivity_table(feats, fit_idx, fit_idx, deps_of)["has_peers"].values
+            val_has = connectivity_table(feats, fit_idx, val_idx, deps_of)["has_peers"].values
+            test_has = connectivity_table(feats, fit_idx, test_idx, deps_of)["has_peers"].values
+            sc_v, sc_t = {}, {}
+            for g in [True, False]:
+                sub = fit_idx[fit_has == g]
+                vsel = val_has == g
+                if seed == args.seeds[0]:
+                    share = is_contam[fit_has == g].mean()
+                    print(f"    [{'peers' if g else 'no peers'}] {len(sub)} training packages, "
+                          f"contamination share {share:.1%}", flush=True)
+                preps = {}
+
+                def X_for(mode):
+                    if mode == "raw":
+                        return X_raw
+                    if mode not in preps:
+                        preps[mode] = preprocess(X_raw, sub, mode)
+                    return preps[mode]
+
+                if g not in settings:  # choose on validation within the subgroup, first seed
+                    best = None
+                    for cand in candidates(kind):
+                        Xm = X_for(cand["mode"])
+                        mdl = fit_model(kind, cand, Xm[sub], seed)
+                        sc = roc_auc_score(y_val[vsel], -mdl.decision_function(Xm[val_idx][vsel]),
+                                           max_fpr=SELECT_MAX_FPR)
+                        if best is None or sc > best[0]:
+                            best = (sc, cand)
+                    settings[g] = best[1]
+                    chosen.append({"level": level, "features": set_name, "method": kind, "variant": "split",
+                                   "setting": f"{'peers' if g else 'no peers'}: {best[1]}", "val_pauc": best[0]})
+                Xm = X_for(settings[g]["mode"])
+                mdl = fit_model(kind, settings[g], Xm[sub], seed)
+                sc_v[g], sc_t[g] = -mdl.decision_function(Xm[val_idx]), -mdl.decision_function(Xm[test_idx])
+            comb = combine(np.where(val_has, sc_v[True], np.nan), np.where(test_has, sc_t[True], np.nan),
+                           sc_v[False], sc_t[False], y_val)
+            seed_scores.append(to_ranks(comb))
+            seed_rows.append(point_metrics(comb, y, w, hard, gd_fpr))
+        return summarise(level, f"{kind} per subgroup ({set_name})", "split", set_name, kind,
+                         seed_scores, seed_rows, str(settings))
+
     def summarise(level, name, variant, set_name, kind, seed_scores, seed_rows, setting):
         s_ens = np.mean(seed_scores, axis=0)
         row = {"level": level, "method": name, "variant": variant, "features": set_name, "detector": kind,
@@ -673,10 +731,13 @@ def main():
         for set_name, cols in feature_sets.items():
             X_raw = feats[cols].fillna(0).values.astype(float)
             for kind in args.detectors:
-                for variant in ["naive", "robust", "fixed"]:
+                for variant in ["naive", "robust", "fixed", "split"]:
                     if variant not in args.variants or (variant == "fixed" and level == 0):
                         continue
                     if kind == "PEER" and variant != "naive":
+                        continue
+                    if variant == "split":
+                        rows.append(run_split(level, set_name, X_raw, kind))
                         continue
                     rows.append(run(level, set_name, X_raw, kind, variant))
             # combined rows: calibration control, and PEER for packages with peers + OCSVM otherwise
