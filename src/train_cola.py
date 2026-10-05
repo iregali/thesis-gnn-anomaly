@@ -98,7 +98,7 @@ DIM = 64
 # Graph with held-out packages attached (no links between held-out packages)
 # ---------------------------------------------------------------------------
 class ScoringGraph:
-    def __init__(self, bundle, context_features="none", min_users=3):
+    def __init__(self, bundle, context_features="none", min_users=3, rescale="bundle"):
         g = bundle["graph"]
         n0 = g.num_nodes
         ei = g.edge_index.numpy()
@@ -133,11 +133,27 @@ class ScoringGraph:
         self.x = torch.cat([g.x, bundle["x_heldout"].float(), torch.from_numpy(x_extra).float()])
         self.n_train, self.n_held = n0, nh
         self.loo_keys = None
+        self.train_anchors = np.where(~g.is_context.numpy())[0]       # evaluated training packages
+        if rescale == "all":
+            self._rescale_all()
         if context_features == "users":
             self._user_features(bundle, g, min_users)
-        self.train_anchors = np.where(~g.is_context.numpy())[0]       # evaluated training packages
         self.held_node = n0 + np.arange(nh)
         self.held_paths = h["path"].values
+
+    def _rescale_all(self):
+        """Standardise EVERY column (0/1 flags included) with the training packages'
+        mean and std, i.e. the baselines' scale_all preprocessing on top of the
+        bundle's (log1p + standardise continuous, flags raw). Continuous columns are
+        already standardised and stay (almost) unchanged; a rare flag now counts by
+        its rarity among training packages. Columns constant on the training
+        packages (e.g. is_context) are left as they are. Applied before the context
+        profiles, so profiles are means of rescaled features."""
+        xt = self.x[torch.from_numpy(self.train_anchors)]
+        mu, sd = xt.mean(0), xt.std(0)
+        const = sd < 1e-8
+        mu[const], sd[const] = 0.0, 1.0
+        self.x = (self.x - mu) / sd
 
     def _user_features(self, bundle, g, min_users):
         """Context nodes get the mean archive features of their training users."""
