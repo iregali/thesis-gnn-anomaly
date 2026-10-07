@@ -14,8 +14,20 @@ nothing is executed), identically for both classes:
   code_exact   fingerprint of all normalised .py code (as in make_campaigns.py)
   code_near    estimated Jaccard >= 0.8 of the normalised code (MinHash + LSH)
 Two packages are TWINS for an artifact type if they share an artifact of that
-type. Artifacts held by more than --max-share of the packages are ignored
-(placeholders such as author@example.com, github.com).
+type. Too-common artifacts are ignored (placeholders such as
+author@example.com, github.com), decided by --cap-source:
+  normal  (default) held by more than --max-share of the NORMAL packages.
+          Placeholders are dropped, large malware campaigns are not.
+  pool    held by more than --max-share of the pooled sample (first version;
+          also drops the members of a large campaign once they exceed the cap,
+          which made the author / email rates collapse between 2% and 5%).
+
+Family view (analysis only; campaign labels never become features or edges):
+  malicious_fw  share of malicious packages with a twin, weighted so that every
+                malware family in the subsample counts equally
+  scenario "no_largest": the largest malware family is removed from the
+                population before subsampling, so it can neither have nor be
+                a twin.
 
 The sampling problem: malregistry is close to the COMPLETE set of known
 PyPI malware, while the normal packages are a small random sample of PyPI
@@ -54,7 +66,7 @@ import numpy as np
 import pandas as pd
 
 sys.path.insert(0, os.path.dirname(__file__))
-from baseline_protocol import DATA_DIR, RESULTS_DIR, load_features  # noqa: E402
+from baseline_protocol import DATA_DIR, RESULTS_DIR, SPLIT_FILE, load_features  # noqa: E402
 from extract_static_features import read_archive  # noqa: E402
 from make_campaigns import BLOB_RE, minhash_of, name_variants, near_duplicate_pairs  # noqa: E402
 
@@ -162,7 +174,9 @@ def main():
     ap.add_argument("--fractions", type=float, nargs="*", default=[0.01, 0.02, 0.05, 0.10, 1.0])
     ap.add_argument("--reps", type=int, default=30)
     ap.add_argument("--max-share", type=float, default=0.01,
-                    help="ignore artifacts held by more than this share of all packages")
+                    help="ignore artifacts held by more than this share of the reference packages")
+    ap.add_argument("--cap-source", default="normal", choices=["normal", "pool"],
+                    help="reference for 'too common': the normal packages (default) or the pooled sample")
     ap.add_argument("--near", type=float, default=0.8, help="near-duplicate threshold (code_near)")
     ap.add_argument("--workers", type=int, default=NUM_WORKERS)
     args = ap.parse_args()
@@ -177,11 +191,15 @@ def main():
     nor = feats[feats["label"] == 0]
     pkgs = pd.concat([nor, mal], ignore_index=True)
     print(f"normal {len(nor)} | malicious (one release per name) {len(mal)}", flush=True)
+    splits = pd.read_csv(f"{DATA_DIR}/{SPLIT_FILE}", dtype=str, keep_default_na=False)
+    fam_of = dict(zip(splits["path"], splits["campaign_id"]))
     cache = extract(list(zip(pkgs["Name"], pkgs["Version"], pkgs["path"])), args.workers)
 
     n = len(pkgs)
     label = pkgs["label"].values
     paths = pkgs["path"].values
+    family = np.array([fam_of.get(p, "") or f"single:{p}" if l == 1 else "" for p, l in zip(paths, label)], dtype=object)
+    n_normal = int((label == 0).sum())
     # artifact -> member indices, per type (only artifacts held by >= 2 packages can create twins)
     groups = {}
     for t in TYPES[:-1]:
@@ -201,7 +219,7 @@ def main():
     def twin_flags(pool):
         """Per type: (has a twin in the pool, has a NORMAL twin in the pool) for every package.
         Artifacts held by more than max_share of the POOL are ignored (too common)."""
-        cap = max(2, int(args.max_share * pool.sum()))
+        cap = max(2, int(args.max_share * (pool.sum() if args.cap_source == "pool" else n_normal)))
         out = {}
         for t in TYPES:
             has = np.zeros(n, dtype=bool)
@@ -215,7 +233,11 @@ def main():
             else:
                 for g in groups[t]:
                     m = g[pool[g]]
-                    if len(m) < 2 or len(m) > cap:
+                    if len(m) < 2:
+                        continue
+                    if args.cap_source == "pool" and len(m) > cap:
+                        continue
+                    if args.cap_source == "normal" and int((label[g] == 0).sum()) > cap:
                         continue
                     has[m] = True
                     n_norm = int((label[m] == 0).sum())
@@ -225,37 +247,55 @@ def main():
         return out
 
     idx_nor = np.where(label == 0)[0]
-    idx_mal = np.where(label == 1)[0]
+    all_mal = np.where(label == 1)[0]
+    fam_sizes = pd.Series(family[all_mal]).value_counts()
+    largest = fam_sizes.index[0]
+    print(f"[info] largest malware family: {largest} with {fam_sizes.iloc[0]} of {len(all_mal)} names "
+          f"({fam_sizes.iloc[0] / len(all_mal):.1%}); {len(fam_sizes)} families", flush=True)
+    scenarios = {"all": all_mal, "no_largest": all_mal[family[all_mal] != largest]}
     rows = []
-    for f in args.fractions:
-        k = max(1, int(round(f * len(idx_mal))))
-        for rep in range(args.reps if f < 1.0 else 1):
-            rng = np.random.default_rng(1000 + rep)
-            pick = rng.choice(idx_mal, size=k, replace=False) if f < 1.0 else idx_mal
-            pool = np.zeros(n, dtype=bool)
-            pool[idx_nor] = True
-            pool[pick] = True
-            flags = twin_flags(pool)
-            for t in TYPES:
-                has, has_norm = flags[t]
-                rows.append({"fraction": f, "rep": rep, "type": t, "n_malicious": k,
-                             "twin_rate_malicious": has[pick].mean(), "twin_rate_normal": has[idx_nor].mean(),
-                             "malicious_with_normal_twin": has_norm[pick].mean()})
-        print(f"  fraction {f}: done", flush=True)
-    res = pd.DataFrame(rows).groupby(["type", "fraction"]).agg(
-        n_malicious=("n_malicious", "first"),
+    for scen, idx_mal in scenarios.items():
+        for f in args.fractions:
+            k = max(1, int(round(f * len(idx_mal))))
+            for rep in range(args.reps if f < 1.0 else 1):
+                rng = np.random.default_rng(1000 + rep)
+                pick = rng.choice(idx_mal, size=k, replace=False) if f < 1.0 else idx_mal
+                pool = np.zeros(n, dtype=bool)
+                pool[idx_nor] = True
+                pool[pick] = True
+                flags = twin_flags(pool)
+                fam_pick = pd.Series(family[pick])
+                w = (1.0 / fam_pick.map(fam_pick.value_counts())).values   # every family counts equally
+                for t in TYPES:
+                    has, has_norm = flags[t]
+                    rows.append({"scenario": scen, "fraction": f, "rep": rep, "type": t, "n_malicious": k,
+                                 "n_families": fam_pick.nunique(),
+                                 "twin_rate_malicious": has[pick].mean(),
+                                 "twin_rate_malicious_fw": float(np.sum(w * has[pick]) / np.sum(w)),
+                                 "twin_rate_normal": has[idx_nor].mean(),
+                                 "malicious_with_normal_twin": has_norm[pick].mean()})
+            print(f"  {scen}, fraction {f}: done", flush=True)
+    res = pd.DataFrame(rows).groupby(["scenario", "type", "fraction"]).agg(
+        n_malicious=("n_malicious", "first"), n_families=("n_families", "mean"),
         malicious=("twin_rate_malicious", "mean"), malicious_sd=("twin_rate_malicious", "std"),
+        malicious_fw=("twin_rate_malicious_fw", "mean"),
         normal=("twin_rate_normal", "mean"),
         malicious_with_normal_twin=("malicious_with_normal_twin", "mean")).reset_index()
     res["ratio"] = res["malicious"] / res["normal"].replace(0, np.nan)
+    res["ratio_fw"] = res["malicious_fw"] / res["normal"].replace(0, np.nan)
     os.makedirs(RESULTS_DIR, exist_ok=True)
-    res.to_csv(f"{RESULTS_DIR}/artifact_twins.csv", index=False)
+    out_csv = f"{RESULTS_DIR}/artifact_twins_{args.cap_source}cap.csv"
+    res.to_csv(out_csv, index=False)
     pd.set_option("display.width", 200)
     print("\n=== Twin rates in the pooled sample (all normals + malware subsampled to the fraction) ===")
     print("malicious / normal = share of packages with >= 1 twin of that type in the pool;")
+    print("malicious_fw = same, every malware family counted equally; scenario no_largest = largest family removed")
+    print(f"'too common' artifacts decided on: {args.cap_source} packages (> {args.max_share:.0%})")
     print("fraction 1.0 = all malware (one release per name): NOT density-matched, shown for contrast")
-    print(res.round(3).to_string(index=False))
-    print(f"\nSaved {RESULTS_DIR}/artifact_twins.csv")
+    for scen in res["scenario"].unique():
+        print(f"\n--- scenario: {scen} ---")
+        print(res[res["scenario"] == scen].drop(columns="scenario").round(3).to_string(index=False))
+    print(f"\nSaved {out_csv}")
 
 
 if __name__ == "__main__":
