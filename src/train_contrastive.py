@@ -87,7 +87,7 @@ from sklearn.svm import OneClassSVM
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from baseline_protocol import LOF_NEIGHBORS, OCSVM_GAMMA, OCSVM_NU, RESULTS_DIR, SELECT_MAX_FPR  # noqa: E402
 from build_graph import load_bundle  # noqa: E402
-from gnn_eval import Evaluator  # noqa: E402
+from gnn_eval import Evaluator, train_subset  # noqa: E402
 from train_cola import ScoringGraph, bundle_path  # noqa: E402
 from train_ocgnn import DIM, FANOUT, OCGNN, gather, memory, sample_tree  # noqa: E402
 
@@ -275,6 +275,50 @@ def dgi_scores(model, E_fit, E, device):
 
 
 # ---------------------------------------------------------------------------
+# Learning curves: fewer training packages
+# ---------------------------------------------------------------------------
+def subsample_bundle(b, frac, seed):
+    """Copy of the bundle in which only `frac` of the evaluated training packages
+    remain (gnn_eval.train_subset, same packages as the raw-feature curve). The
+    dropped packages lose all their edges and are marked as non-anchors, so they
+    are neither trained on, nor neighbours, nor users in context profiles, nor in
+    the rescaling statistics. Context nodes whose users were all dropped stay as
+    edge-less nodes (never reached)."""
+    nodes = b["nodes"]
+    ev = np.where(nodes["kind"].values == "evaluated")[0]
+    keep = train_subset(nodes["path"].values[ev], frac, seed)
+    drop = np.array([i for i in ev if nodes["path"].values[i] not in keep], dtype=np.int64)
+    dmask = torch.zeros(b["graph"].num_nodes, dtype=torch.bool)
+    dmask[torch.from_numpy(drop)] = True
+    g = b["graph"].clone()
+    for attr in ("edge_index", "dep_edge_index"):
+        e = getattr(g, attr)
+        setattr(g, attr, e[:, ~(dmask[e[0]] | dmask[e[1]])])
+    g.is_context = g.is_context | dmask
+    out = dict(b)
+    out["graph"] = g
+    dset = set(drop.tolist())
+    out["dependents"] = {k: [v for v in lst if v not in dset] for k, lst in b["dependents"].items()}
+    out["dropped_nodes"] = drop
+    print(f"  learning curve: keeping {len(ev) - len(drop)} of {len(ev)} evaluated training packages "
+          f"({frac:.0%}, seed {seed})", flush=True)
+    return out
+
+
+def drop_neighbours(graph, drop):
+    """Remove dropped training packages from every neighbour list (also held-out
+    packages that depend on a dropped package's name)."""
+    if len(drop) == 0:
+        return
+    deg = np.diff(graph.indptr)
+    owner = np.repeat(np.arange(len(deg)), deg)
+    ok = ~np.isin(graph.indices, drop)
+    graph.indices = graph.indices[ok]
+    graph.indptr = np.zeros(len(deg) + 1, dtype=np.int64)
+    graph.indptr[1:] = np.cumsum(np.bincount(owner[ok], minlength=len(deg)))
+
+
+# ---------------------------------------------------------------------------
 # Main
 # ---------------------------------------------------------------------------
 def main():
@@ -303,6 +347,9 @@ def main():
     ap.add_argument("--context-features", default="users", choices=["none", "users"])
     ap.add_argument("--context-min-users", type=int, default=3)
     ap.add_argument("--boot", type=int, default=500)
+    ap.add_argument("--train-frac", type=float, default=1.0,
+                    help="learning curve: keep this fraction of the evaluated training packages (per seed); "
+                         "the dropped ones are removed from the graph")
     ap.add_argument("--tag", default=None)
     args = ap.parse_args()
     args.levels = sorted(args.levels)
@@ -327,14 +374,22 @@ def main():
         graphs, runs, chosen_setting = {}, {}, {}
         for seed in args.seeds:
             path = bundle_path(level, seed)
-            if path not in graphs:
+            key = path if args.train_frac >= 1.0 else (path, seed)
+            if key not in graphs:
                 b = load_bundle(path)
-                graphs[path] = (ScoringGraph(b, args.context_features, args.context_min_users, args.rescale), b)
-            graph, b = graphs[path]
+                if args.train_frac < 1.0:
+                    b = subsample_bundle(b, args.train_frac, seed)
+                graphs[key] = (ScoringGraph(b, args.context_features, args.context_min_users, args.rescale), b)
+                if args.train_frac < 1.0:
+                    drop_neighbours(graphs[key][0], b["dropped_nodes"])
+            graph, b = graphs[key]
             pos = {p: i for i, p in enumerate(graph.held_paths)}
             vq = graph.held_node[[pos[p] for p in ev.val_paths]]
             tq = graph.held_node[[pos[p] for p in ev.test_paths]]
-            fit_paths = b["nodes"].loc[b["nodes"]["kind"] == "evaluated", "path"].values
+            ev_nodes = b["nodes"]["kind"] == "evaluated"
+            if args.train_frac < 1.0:
+                ev_nodes &= ~b["nodes"].index.isin(b["dropped_nodes"])
+            fit_paths = b["nodes"].loc[ev_nodes, "path"].values
             for depth in args.depths:
                 print(f"  level {level:.0%} seed {seed} depth {depth}: training", flush=True)
                 t0 = time.time()

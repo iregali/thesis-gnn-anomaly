@@ -80,3 +80,14 @@ class Evaluator:
         has_t = np.asarray((idx.query(self.test_paths, f["Name"].values[self.test_idx], self.deps_of) > 0)
                            .sum(1)).ravel() > 0
         return combine(np.where(has_v, sv, np.nan), np.where(has_t, st, np.nan), sv, st, self.y_val)
+
+
+def train_subset(paths, frac, seed):
+    """Learning curves: the training packages kept at fraction `frac` for this seed.
+    Path-based and order-independent, so the GNN scripts and the raw-feature
+    baselines keep exactly the same packages. frac >= 1 keeps everything."""
+    paths = np.asarray(sorted(set(paths)))
+    if frac >= 1.0:
+        return set(paths)
+    k = max(1, int(round(frac * len(paths))))
+    return set(np.random.default_rng(1000 + seed).choice(paths, size=k, replace=False))
