@@ -468,6 +468,9 @@ def main():
     ap.add_argument("--tag", default=None, help="suffix for the output files")
     ap.add_argument("--detectors", nargs="*", default=["IF", "LOF", "OCSVM", "PEER"],
                     choices=["IF", "LOF", "OCSVM", "PEER"])
+    ap.add_argument("--save-scores", action="store_true",
+                    help="also save per-seed test scores (baseline_protocol_scores{tag}.csv) for "
+                         "paired comparisons with paired_compare.py")
     args = ap.parse_args()
     args.levels = sorted(args.levels)
     if "fixed" in args.variants and (0.0 not in args.levels or "naive" not in args.variants):
@@ -579,6 +582,8 @@ def main():
     labels = {"naive": "", "robust": "+robust", "fixed": " [0% settings]", "split": " per subgroup"}
 
     store = {}        # (level, set, kind, variant) -> per-seed (val scores, test scores)
+    score_rows = []   # --save-scores: per-seed test scores (naive / robust / fixed variants)
+    test_paths = feats["path"].values[test_idx]
     peer_cache = {}   # (level, seed) -> sparse peer matrices for validation and test
 
     def peers_for(level, seed, fit_idx):
@@ -641,6 +646,10 @@ def main():
                 sv, s = -mdl.decision_function(Xm[val_idx]), -mdl.decision_function(Xm[test_idx])
             seed_store.append((sv, s))
             s_f = fill_missing(s)
+            if args.save_scores:
+                score_rows.append(pd.DataFrame({"level": level, "features": set_name, "detector": kind,
+                                                "variant": variant, "seed": seed, "path": test_paths,
+                                                "score": s_f}))
             seed_scores.append(to_ranks(s_f))
             seed_rows.append(point_metrics(s_f, y, w, hard, gd_fpr))
 
@@ -770,6 +779,8 @@ def main():
     chosen.to_csv(f"{RESULTS_DIR}/baseline_protocol_settings{tag}.csv", index=False)
     if len(comp):
         comp.to_csv(f"{RESULTS_DIR}/baseline_protocol_contamination{tag}.csv", index=False)
+    if args.save_scores and score_rows:
+        pd.concat(score_rows).to_csv(f"{RESULTS_DIR}/baseline_protocol_scores{tag}.csv", index=False)
 
     pd.set_option("display.width", 220)
     show = ["level", "method", "auc", "auc_fw", "auc_fw_lo", "auc_fw_hi", "tpr1", "tpr1_fw",
