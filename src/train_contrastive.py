@@ -149,11 +149,12 @@ def feature_mask(n_feat, p, rng):
 class Contrastive(nn.Module):
     def __init__(self, in_dim, depth, args):
         super().__init__()
-        self.enc = OCGNN(in_dim, depth, args.encoder, skip=args.skip, agg=args.agg)
-        out = DIM * 2 if (depth > 0 and args.skip == "concat") else DIM
+        dim = getattr(args, "dim", DIM)
+        self.enc = OCGNN(in_dim, depth, args.encoder, dim=dim, skip=args.skip, agg=args.agg)
+        out = dim * 2 if (depth > 0 and args.skip == "concat") else dim
         self.out_dim = out
         if args.loss in ("infonce", "triplet"):
-            self.proj = nn.Sequential(nn.Linear(out, DIM), nn.ELU(), nn.Linear(DIM, DIM))
+            self.proj = nn.Sequential(nn.Linear(out, dim), nn.ELU(), nn.Linear(dim, dim))
         else:
             self.W = nn.Parameter(torch.empty(out, out))
             nn.init.xavier_uniform_(self.W)
@@ -335,6 +336,7 @@ def main():
     ap.add_argument("--rescale", default="all", choices=["bundle", "all"])
     ap.add_argument("--agg", default="mean", choices=["sum", "mean"])
     ap.add_argument("--epochs", type=int, default=50)
+    ap.add_argument("--dim", type=int, default=DIM, help="embedding size (hidden width of the encoder)")
     ap.add_argument("--batch", type=int, default=512)
     ap.add_argument("--lr", type=float, default=1e-3)
     ap.add_argument("--wd", type=float, default=1e-6)
@@ -369,7 +371,7 @@ def main():
            "gps": "GraphGPS"}[args.encoder]
     lname = {"infonce": "InfoNCE", "triplet": "Triplet", "dgi": "DGI"}[args.loss]
     scorers = SCORERS + (["DGI-D"] if args.loss == "dgi" else [])
-    rows, settings, score_rows = [], [], []
+    rows, settings, score_rows, seed_val = [], [], [], []
     for level in args.levels:
         graphs, runs, chosen_setting = {}, {}, {}
         for seed in args.seeds:
@@ -425,6 +427,8 @@ def main():
                         settings.append({"level": level, "depth": depth, "scorer": kind, "setting": "{}",
                                          "val_pauc": pauc})
                     runs.setdefault(key, []).append((sv, st, fit_paths))
+                    seed_val.append({"level": level, "seed": seed, "depth": depth, "scorer": kind,
+                                     "val_pauc": roc_auc_score(ev.y_val, sv, max_fpr=SELECT_MAX_FPR)})
                     print(f"    {kind:6s} val pAUC(<=5% FPR) {pauc:.3f}  {setting}", flush=True)
                     for which, pths, s_ in [("val", ev.val_paths, sv), ("test", ev.test_paths, st)]:
                         score_rows.append(pd.DataFrame({"level": level, "seed": seed, "depth": depth, "scorer": kind,
@@ -447,6 +451,7 @@ def main():
     results.to_csv(f"{RESULTS_DIR}/contrastive_results{tag}.csv", index=False)
     settings.to_csv(f"{RESULTS_DIR}/contrastive_settings{tag}.csv", index=False)
     pd.concat(score_rows).to_csv(f"{RESULTS_DIR}/contrastive_scores{tag}.csv", index=False)
+    pd.DataFrame(seed_val).to_csv(f"{RESULTS_DIR}/contrastive_valseeds{tag}.csv", index=False)
 
     pd.set_option("display.width", 250)
     print(f"\n=== {lname} + {enc}: test results (family-weighted) ===")
