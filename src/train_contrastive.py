@@ -57,6 +57,18 @@ and reused for the other seeds. For DGI the discriminator's own score
 (1 - agreement with the training summary) is also reported (scorer "DGI-D").
 Plain and subgroup-calibrated rows, as for every other method.
 
+Proposed loss (RQ3, Methodology section 38; src/structure_rarity.py). Off by default:
+without these flags training is exactly the original.
+  --strata conn        same-group negatives (connected / isolated); DGI: one summary per group
+  --shift rare         rarity-shifted copies as extra negatives (DGI: as the corruption);
+                       --rare-nu (rare = 0 < variability <= nu among training packages),
+                       --shift-k copies per package, --shift-nfeat features changed per copy,
+                       --shift-weight (InfoNCE lambda / triplet beta; unused for DGI)
+  --shift uniform      the same, features chosen among ALL varying features (ablation N4)
+The shifted copy of a package re-uses the sampled neighbourhood, neighbour dropping and
+feature mask of its second view, and only unmasked features are shifted, so the copy
+differs from the positive view in the shifted features alone.
+
 Outputs (RESULTS_DIR): contrastive_results{tag}.csv, contrastive_settings{tag}.csv
 (validation pAUC per depth / scorer / setting, chosen row marked),
 contrastive_scores{tag}.csv (level, seed, depth, scorer, split, path, score).
@@ -90,6 +102,8 @@ from build_graph import load_bundle  # noqa: E402
 from gnn_eval import Evaluator, train_subset  # noqa: E402
 from train_cola import ScoringGraph, bundle_path  # noqa: E402
 from train_ocgnn import DIM, FANOUT, OCGNN, gather, memory, sample_tree  # noqa: E402
+from structure_rarity import (RarityShifter, connectivity_groups, dgi_sr, group_summaries,  # noqa: E402
+                              infonce_sr, triplet_sr)
 
 LEVELS = [0.0, 0.01]
 SEEDS = [0, 1, 2]
@@ -100,10 +114,19 @@ SCORERS = ["IF", "LOF", "OCSVM"]
 # ---------------------------------------------------------------------------
 # Views
 # ---------------------------------------------------------------------------
-def view(graph, anchors, depth, rng, device, args, training=True, feat_mask=None, drop_p=0.0, corrupt=False):
+def view(graph, anchors, depth, rng, device, args, training=True, feat_mask=None, drop_p=0.0, corrupt=False,
+         keep=None, reuse=None, own=None):
     """Model inputs for one view of the anchors. feat_mask [F] (1 = keep) or None;
-    drop_p = neighbour-slot dropping; corrupt = DGI row-wise feature shuffling."""
-    n1, m1, n2, m2 = sample_tree(graph, anchors, depth, args.fanout, rng, args.isolated)
+    drop_p = neighbour-slot dropping; corrupt = DGI row-wise feature shuffling.
+    keep: dict that receives the sampled tree and memory (to build a shifted copy of this view);
+    reuse: such a dict, used instead of sampling (no new random draws);
+    own [B, F]: replacement rows for the anchors' own features (shifted copies), also used in
+    neighbour slots that hold the anchor itself (isolated padding, dropped slots)."""
+    if reuse is not None:
+        n1, m1, n2, m2 = reuse["tree"]
+        drop_p = 0.0                      # the reused tree already has its drops
+    else:
+        n1, m1, n2, m2 = sample_tree(graph, anchors, depth, args.fanout, rng, args.isolated)
     if depth >= 1 and drop_p > 0:
         d1 = rng.random(n1.shape) < drop_p
         n1 = np.where(d1, anchors[:, None], n1)
@@ -125,14 +148,29 @@ def view(graph, anchors, depth, rng, device, args, training=True, feat_mask=None
         x0 = graph.x[torch.from_numpy(anchors)]
         x1 = gather(graph, anchors, n1, training) if depth >= 1 else None
         x2 = gather(graph, anchors, n2, training) if depth == 2 else None
+    if own is not None:
+        x0 = own
+        if depth >= 1:
+            b, j = np.nonzero(n1 == anchors[:, None])
+            x1[torch.from_numpy(b), torch.from_numpy(j)] = own[torch.from_numpy(b)]
+        if depth == 2:
+            b, j, k = np.nonzero(n2 == anchors[:, None, None])
+            x2[torch.from_numpy(b), torch.from_numpy(j), torch.from_numpy(k)] = own[torch.from_numpy(b)]
     if feat_mask is not None:
         x0 = x0 * feat_mask
         x1 = x1 * feat_mask if x1 is not None else None
         x2 = x2 * feat_mask if x2 is not None else None
     x0 = x0.to(device)
+    if keep is not None:
+        keep["tree"] = (n1, m1, n2, m2)
     if depth == 0:
         return (x0,)
-    mem = memory(graph, anchors, depth, args.fanout, rng, device, args.isolated, args.mem) if args.mem else None
+    if reuse is not None:
+        mem = reuse["mem"]
+    else:
+        mem = memory(graph, anchors, depth, args.fanout, rng, device, args.isolated, args.mem) if args.mem else None
+    if keep is not None:
+        keep["mem"] = mem
     m1t = torch.from_numpy(m1).to(device)
     if depth == 1:
         return x0, x1.to(device), m1t, None, None, mem
@@ -166,6 +204,10 @@ class Contrastive(nn.Module):
         """DGI bilinear discriminator logits: h [B, d], s [d]."""
         return h @ (self.W @ s)
 
+    def disc_rows(self, h, S):
+        """Per-row summaries: logit_i = h_i^T W S_i, h and S [B, d]."""
+        return (h * (S @ self.W.t())).sum(-1)
+
 
 def infonce(z1, z2, tau):
     z1, z2 = F.normalize(z1, dim=-1), F.normalize(z2, dim=-1)
@@ -191,6 +233,43 @@ def triplet(z1, z2, margin, mining, rng):
     return F.relu(d_pos - d_neg + margin).mean()
 
 
+def make_shifter(graph, args):
+    """Shift sampler on the training packages' own feature rows (no labels); None without --shift."""
+    if getattr(args, "shift", "none") == "none":
+        return None
+    return RarityShifter(graph.x[torch.from_numpy(graph.train_anchors)], mode=args.shift, nu=args.rare_nu,
+                         names=getattr(graph, "feature_names", None))
+
+
+def proposed_loss(model, graph, b, depth, rng, device, args, n_feat, shifter, groups):
+    """Loss of the proposed method (any of --strata / --shift on)."""
+    if args.loss == "dgi":
+        keep = {}
+        h = model(*view(graph, b, depth, rng, device, args, keep=keep))
+        if shifter is None:   # N1 for DGI: per-group summaries, original corruption
+            h_neg = model(*view(graph, b, depth, rng, device, args, corrupt=True))
+        else:                 # corruption = shifted copies in the same neighbourhood
+            x_own = graph.x[torch.from_numpy(b)]
+            h_neg = torch.cat([model(*view(graph, b, depth, rng, device, args, reuse=keep,
+                                           own=shifter.shift(x_own, args.shift_nfeat, rng)[0]))
+                               for _ in range(args.shift_k)])
+        return dgi_sr(model.disc_rows, h, h_neg, groups)
+    m1, m2 = feature_mask(n_feat, args.mask_p, rng), feature_mask(n_feat, args.mask_p, rng)
+    z1 = model.proj(model(*view(graph, b, depth, rng, device, args, feat_mask=m1, drop_p=args.drop_p)))
+    keep = {}
+    z2 = model.proj(model(*view(graph, b, depth, rng, device, args, feat_mask=m2, drop_p=args.drop_p, keep=keep)))
+    z_shift = None
+    if shifter is not None:
+        x_own = graph.x[torch.from_numpy(b)]
+        allowed = m2.numpy() > 0      # a masked feature cannot carry the shift
+        z_shift = torch.stack([model.proj(model(*view(graph, b, depth, rng, device, args, feat_mask=m2, reuse=keep,
+                                                      own=shifter.shift(x_own, args.shift_nfeat, rng, allowed)[0])))
+                               for _ in range(args.shift_k)])
+    if args.loss == "infonce":
+        return infonce_sr(z1, z2, args.tau, groups, z_shift, args.shift_weight)
+    return triplet_sr(z1, z2, args.margin, args.mining, rng, groups, z_shift, args.shift_weight)
+
+
 def train(graph, depth, seed, args, device):
     torch.manual_seed(seed)
     rng = np.random.default_rng(seed)
@@ -198,6 +277,19 @@ def train(graph, depth, seed, args, device):
     opt = torch.optim.Adam(model.parameters(), lr=args.lr, weight_decay=args.wd)
     anchors = graph.train_anchors
     n_feat = graph.x.shape[1]
+    proposed = getattr(args, "strata", "none") != "none" or getattr(args, "shift", "none") != "none"
+    shifter = make_shifter(graph, args)
+    group_of = None
+    if getattr(args, "strata", "none") == "conn":
+        group_of = np.zeros(graph.x.shape[0], dtype=np.int64)
+        group_of[anchors] = connectivity_groups(graph, anchors)
+    if proposed and not getattr(args, "_described", False):
+        if group_of is not None:
+            print(f"    same-group negatives: {group_of[anchors].mean():.1%} of training packages connected",
+                  flush=True)
+        if shifter is not None:
+            print(f"    shifted negatives: {shifter.describe()}", flush=True)
+        args._described = True
     for ep in range(args.epochs):
         perm = rng.permutation(anchors)
         tot = 0.0
@@ -205,7 +297,10 @@ def train(graph, depth, seed, args, device):
             b = perm[a:a + args.batch]
             if len(b) < 2:
                 continue
-            if args.loss == "dgi":
+            if proposed:
+                loss = proposed_loss(model, graph, b, depth, rng, device, args, n_feat, shifter,
+                                     group_of[b] if group_of is not None else None)
+            elif args.loss == "dgi":
                 h = model(*view(graph, b, depth, rng, device, args))
                 h_c = model(*view(graph, b, depth, rng, device, args, corrupt=True))
                 s = torch.sigmoid(h.mean(0))
@@ -269,10 +364,21 @@ def apply_scorer(fitted, E):
     return -mdl.decision_function(sc.transform(E) if sc is not None else E)
 
 
-def dgi_scores(model, E_fit, E, device):
+def dgi_scores(model, E_fit, E, device, g_fit=None, g=None):
+    """1 - agreement with the training summary; with groups, the summary of the package's own group."""
     with torch.no_grad():
-        s = torch.sigmoid(torch.from_numpy(E_fit).float().to(device).mean(0))
-        return -model.disc(torch.from_numpy(E).float().to(device), s).cpu().numpy()
+        Ef = torch.from_numpy(E_fit).float().to(device)
+        Et = torch.from_numpy(E).float().to(device)
+        if g_fit is None:
+            s = torch.sigmoid(Ef.mean(0))
+            return -model.disc(Et, s).cpu().numpy()
+        glob = torch.sigmoid(Ef.mean(0))
+        S = glob.expand_as(Et).clone()
+        for v in np.unique(g):
+            sel_fit = np.asarray(g_fit) == v
+            if sel_fit.any():
+                S[torch.from_numpy(np.asarray(g) == v)] = torch.sigmoid(Ef[torch.from_numpy(sel_fit)].mean(0))
+        return -model.disc_rows(Et, S).cpu().numpy()
 
 
 # ---------------------------------------------------------------------------
@@ -352,6 +458,14 @@ def main():
     ap.add_argument("--train-frac", type=float, default=1.0,
                     help="learning curve: keep this fraction of the evaluated training packages (per seed); "
                          "the dropped ones are removed from the graph")
+    ap.add_argument("--strata", default="none", choices=["none", "conn"],
+                    help="proposed loss: negatives only from the anchor's connectivity group (DGI: summary per group)")
+    ap.add_argument("--shift", default="none", choices=["none", "rare", "uniform"],
+                    help="proposed loss: shifted copies as extra negatives (rare features, or any varying feature)")
+    ap.add_argument("--rare-nu", type=float, default=0.05, help="rare = variability among training packages <= nu")
+    ap.add_argument("--shift-k", type=int, default=1, help="shifted copies per package")
+    ap.add_argument("--shift-nfeat", type=int, default=1, help="features changed per shifted copy")
+    ap.add_argument("--shift-weight", type=float, default=1.0, help="InfoNCE lambda / triplet beta (unused for DGI)")
     ap.add_argument("--tag", default=None)
     args = ap.parse_args()
     args.levels = sorted(args.levels)
@@ -360,7 +474,9 @@ def main():
     device = "cuda" if torch.cuda.is_available() else "cpu"
     print(f"device {device} | loss {args.loss} | encoder {args.encoder} | depths {args.depths} | rescale "
           f"{args.rescale} | agg {args.agg} | context {args.context_features} | views: mask {args.mask_p}, "
-          f"drop {args.drop_p}", flush=True)
+          f"drop {args.drop_p} | strata {args.strata} | shift {args.shift}"
+          + (f" (nu {args.rare_nu}, k {args.shift_k}, nfeat {args.shift_nfeat}, weight {args.shift_weight})"
+             if args.shift != "none" else ""), flush=True)
     missing = sorted({bundle_path(lv, s) for lv in args.levels for s in args.seeds
                       if not os.path.exists(bundle_path(lv, s))})
     if missing:
@@ -382,6 +498,7 @@ def main():
                 if args.train_frac < 1.0:
                     b = subsample_bundle(b, args.train_frac, seed)
                 graphs[key] = (ScoringGraph(b, args.context_features, args.context_min_users, args.rescale), b)
+                graphs[key][0].feature_names = list(b["feature_names"])
                 if args.train_frac < 1.0:
                     drop_neighbours(graphs[key][0], b["dropped_nodes"])
             graph, b = graphs[key]
@@ -402,7 +519,12 @@ def main():
                 for kind in scorers:
                     key = (depth, kind)
                     if kind == "DGI-D":
-                        sv, st = dgi_scores(model, E_fit, E_v, device), dgi_scores(model, E_fit, E_t, device)
+                        if args.strata == "conn":
+                            gf = connectivity_groups(graph, graph.train_anchors)
+                            sv = dgi_scores(model, E_fit, E_v, device, gf, connectivity_groups(graph, vq))
+                            st = dgi_scores(model, E_fit, E_t, device, gf, connectivity_groups(graph, tq))
+                        else:
+                            sv, st = dgi_scores(model, E_fit, E_v, device), dgi_scores(model, E_fit, E_t, device)
                         setting = {}
                         pauc = roc_auc_score(ev.y_val, sv, max_fpr=SELECT_MAX_FPR)
                     elif key not in chosen_setting:   # first seed: choose the setting on validation
