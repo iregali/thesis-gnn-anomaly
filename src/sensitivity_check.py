@@ -42,6 +42,9 @@ features).
 Usage
   python src/sensitivity_check.py                         # InfoNCE + GIN, depths 0 1, seeds 0 1 2
   python src/sensitivity_check.py --encoder gps --depths 1
+  # mechanism check of the proposed loss (Methodology section 38): same settings as the run, e.g.
+  python src/sensitivity_check.py --loss triplet --depths 1 --epochs 25 --dim 128 \
+      --strata conn --shift rare --rare-nu 0.05 --shift-k 4 --shift-weight 1 --tag _triplet_gin_n3
 """
 import argparse
 import os
@@ -126,6 +129,14 @@ def main():
     ap.add_argument("--drop-p", type=float, default=0.2)
     ap.add_argument("--context-features", default="users", choices=["none", "users"])
     ap.add_argument("--context-min-users", type=int, default=3)
+    ap.add_argument("--dim", type=int, default=TC.DIM, help="embedding size (tuned runs: tuning_choice.csv)")
+    # proposed loss (structure_rarity.py); off by default, same meaning as in train_contrastive.py
+    ap.add_argument("--strata", default="none", choices=["none", "conn"])
+    ap.add_argument("--shift", default="none", choices=["none", "rare", "uniform"])
+    ap.add_argument("--rare-nu", type=float, default=0.05)
+    ap.add_argument("--shift-k", type=int, default=1)
+    ap.add_argument("--shift-nfeat", type=int, default=1)
+    ap.add_argument("--shift-weight", type=float, default=1.0)
     args = ap.parse_args()
     args.mem = args.gps_memory if args.encoder == "gps" else 0
     tag = args.tag if args.tag is not None else f"_{args.loss}_{args.encoder}"
@@ -133,6 +144,7 @@ def main():
 
     b = load_bundle(bundle_path(0.0, 0))
     graph = ScoringGraph(b, args.context_features, args.context_min_users, args.rescale)
+    graph.feature_names = list(b["feature_names"])
     names = list(b["feature_names"])
     h = b["heldout"]
     split = h["split"].values if "split" in h.columns else None
