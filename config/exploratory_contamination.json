@@ -1,0 +1,311 @@
+{
+ "_about": "EXPLORATORY comparisons (Methodology section 38), written on 10 Oct 2026 AFTER the descriptive N1-N4 and 2%/5% results were seen. Not pre-registered: report as exploratory, with Holm within each family but no confirmatory claim. Run with: python src/paired_compare.py --spec config/exploratory_contamination.json --tag _expl",
+ "_conventions": "a minus b. Test set, family-weighted. Contaminated training at the given level; contrastive depth and scorer = the configuration chosen on validation at that level (plain scores). Raw baselines from baseline_protocol.py --save-scores --tag _expl (same contamination draws per seed as the graph bundles). Statistic: seed-mean metric; two-level bootstrap (test packages, training seeds); 1% FPR threshold recomputed in every resample.",
+ "alpha": 0.05,
+ "boot": 5000,
+ "seed_resample": true,
+ "bootstrap_seed": 0,
+ "families": {
+  "expl_vs_base": [
+   {
+    "id": "X1",
+    "metric": "tpr1_fw",
+    "question": "Triplet + GIN, 1% contamination: N3 vs tuned",
+    "a": {
+     "type": "contrastive",
+     "tag": "_triplet_gin_n3",
+     "level": 0.01
+    },
+    "b": {
+     "type": "contrastive",
+     "tag": "_triplet_gin_tuned",
+     "level": 0.01
+    }
+   },
+   {
+    "id": "X2",
+    "metric": "auc_fw",
+    "question": "Triplet + GIN, 1% contamination: N3 vs tuned",
+    "a": {
+     "type": "contrastive",
+     "tag": "_triplet_gin_n3",
+     "level": 0.01
+    },
+    "b": {
+     "type": "contrastive",
+     "tag": "_triplet_gin_tuned",
+     "level": 0.01
+    }
+   },
+   {
+    "id": "X3",
+    "metric": "tpr1_fw",
+    "question": "Triplet + GIN, 2% contamination: N3 vs tuned",
+    "a": {
+     "type": "contrastive",
+     "tag": "_triplet_gin_n3_c25",
+     "level": 0.02
+    },
+    "b": {
+     "type": "contrastive",
+     "tag": "_triplet_gin_tuned_c25",
+     "level": 0.02
+    }
+   },
+   {
+    "id": "X4",
+    "metric": "auc_fw",
+    "question": "Triplet + GIN, 2% contamination: N3 vs tuned",
+    "a": {
+     "type": "contrastive",
+     "tag": "_triplet_gin_n3_c25",
+     "level": 0.02
+    },
+    "b": {
+     "type": "contrastive",
+     "tag": "_triplet_gin_tuned_c25",
+     "level": 0.02
+    }
+   },
+   {
+    "id": "X5",
+    "metric": "tpr1_fw",
+    "question": "Triplet + GIN, 5% contamination: N3 vs tuned",
+    "a": {
+     "type": "contrastive",
+     "tag": "_triplet_gin_n3_c25",
+     "level": 0.05
+    },
+    "b": {
+     "type": "contrastive",
+     "tag": "_triplet_gin_tuned_c25",
+     "level": 0.05
+    }
+   },
+   {
+    "id": "X6",
+    "metric": "auc_fw",
+    "question": "Triplet + GIN, 5% contamination: N3 vs tuned",
+    "a": {
+     "type": "contrastive",
+     "tag": "_triplet_gin_n3_c25",
+     "level": 0.05
+    },
+    "b": {
+     "type": "contrastive",
+     "tag": "_triplet_gin_tuned_c25",
+     "level": 0.05
+    }
+   },
+   {
+    "id": "X7",
+    "metric": "tpr1_fw",
+    "question": "Triplet + gat, 1% contamination: N3 vs tuned",
+    "a": {
+     "type": "contrastive",
+     "tag": "_triplet_gat_n3",
+     "level": 0.01
+    },
+    "b": {
+     "type": "contrastive",
+     "tag": "_triplet_gat_tuned",
+     "level": 0.01
+    }
+   },
+   {
+    "id": "X8",
+    "metric": "tpr1_fw",
+    "question": "Triplet + tconv, 1% contamination: N3 vs tuned",
+    "a": {
+     "type": "contrastive",
+     "tag": "_triplet_tconv_n3",
+     "level": 0.01
+    },
+    "b": {
+     "type": "contrastive",
+     "tag": "_triplet_tconv_tuned",
+     "level": 0.01
+    }
+   },
+   {
+    "id": "X9",
+    "metric": "tpr1_fw",
+    "question": "Triplet + gps, 1% contamination: N3 vs tuned",
+    "a": {
+     "type": "contrastive",
+     "tag": "_triplet_gps_n3",
+     "level": 0.01
+    },
+    "b": {
+     "type": "contrastive",
+     "tag": "_triplet_gps_tuned",
+     "level": 0.01
+    }
+   }
+  ],
+  "expl_vs_raw": [
+   {
+    "id": "R1",
+    "metric": "tpr1_fw",
+    "question": "1% contamination: Triplet + GIN N3 vs raw OCSVM with per-group thresholds",
+    "a": {
+     "type": "contrastive",
+     "tag": "_triplet_gin_n3",
+     "level": 0.01
+    },
+    "b": {
+     "type": "baseline",
+     "tag": "_expl",
+     "level": 0.01,
+     "detector": "OCSVM (subgroup-calibrated)",
+     "variant": "combined",
+     "features": "static+deps+names+GuardDog"
+    }
+   },
+   {
+    "id": "R2",
+    "metric": "tpr1_fw",
+    "question": "1% contamination: Triplet + GIN N3 vs raw OCSVM",
+    "a": {
+     "type": "contrastive",
+     "tag": "_triplet_gin_n3",
+     "level": 0.01
+    },
+    "b": {
+     "type": "baseline",
+     "tag": "_expl",
+     "level": 0.01,
+     "detector": "OCSVM",
+     "variant": "naive",
+     "features": "static+deps+names+GuardDog"
+    }
+   },
+   {
+    "id": "R3",
+    "metric": "tpr1_fw",
+    "question": "1% contamination: Triplet + GIN N3 vs raw Isolation Forest",
+    "a": {
+     "type": "contrastive",
+     "tag": "_triplet_gin_n3",
+     "level": 0.01
+    },
+    "b": {
+     "type": "baseline",
+     "tag": "_expl",
+     "level": 0.01,
+     "detector": "IF",
+     "variant": "naive",
+     "features": "static+deps+names+GuardDog"
+    }
+   },
+   {
+    "id": "R4",
+    "metric": "tpr1_fw",
+    "question": "2% contamination: Triplet + GIN N3 vs raw OCSVM with per-group thresholds",
+    "a": {
+     "type": "contrastive",
+     "tag": "_triplet_gin_n3_c25",
+     "level": 0.02
+    },
+    "b": {
+     "type": "baseline",
+     "tag": "_expl",
+     "level": 0.02,
+     "detector": "OCSVM (subgroup-calibrated)",
+     "variant": "combined",
+     "features": "static+deps+names+GuardDog"
+    }
+   },
+   {
+    "id": "R5",
+    "metric": "tpr1_fw",
+    "question": "2% contamination: Triplet + GIN N3 vs raw OCSVM",
+    "a": {
+     "type": "contrastive",
+     "tag": "_triplet_gin_n3_c25",
+     "level": 0.02
+    },
+    "b": {
+     "type": "baseline",
+     "tag": "_expl",
+     "level": 0.02,
+     "detector": "OCSVM",
+     "variant": "naive",
+     "features": "static+deps+names+GuardDog"
+    }
+   },
+   {
+    "id": "R6",
+    "metric": "tpr1_fw",
+    "question": "2% contamination: Triplet + GIN N3 vs raw Isolation Forest",
+    "a": {
+     "type": "contrastive",
+     "tag": "_triplet_gin_n3_c25",
+     "level": 0.02
+    },
+    "b": {
+     "type": "baseline",
+     "tag": "_expl",
+     "level": 0.02,
+     "detector": "IF",
+     "variant": "naive",
+     "features": "static+deps+names+GuardDog"
+    }
+   },
+   {
+    "id": "R7",
+    "metric": "tpr1_fw",
+    "question": "5% contamination: Triplet + GIN N3 vs raw OCSVM with per-group thresholds",
+    "a": {
+     "type": "contrastive",
+     "tag": "_triplet_gin_n3_c25",
+     "level": 0.05
+    },
+    "b": {
+     "type": "baseline",
+     "tag": "_expl",
+     "level": 0.05,
+     "detector": "OCSVM (subgroup-calibrated)",
+     "variant": "combined",
+     "features": "static+deps+names+GuardDog"
+    }
+   },
+   {
+    "id": "R8",
+    "metric": "tpr1_fw",
+    "question": "5% contamination: Triplet + GIN N3 vs raw OCSVM",
+    "a": {
+     "type": "contrastive",
+     "tag": "_triplet_gin_n3_c25",
+     "level": 0.05
+    },
+    "b": {
+     "type": "baseline",
+     "tag": "_expl",
+     "level": 0.05,
+     "detector": "OCSVM",
+     "variant": "naive",
+     "features": "static+deps+names+GuardDog"
+    }
+   },
+   {
+    "id": "R9",
+    "metric": "tpr1_fw",
+    "question": "5% contamination: Triplet + GIN N3 vs raw Isolation Forest",
+    "a": {
+     "type": "contrastive",
+     "tag": "_triplet_gin_n3_c25",
+     "level": 0.05
+    },
+    "b": {
+     "type": "baseline",
+     "tag": "_expl",
+     "level": 0.05,
+     "detector": "IF",
+     "variant": "naive",
+     "features": "static+deps+names+GuardDog"
+    }
+   }
+  ]
+ }
+}

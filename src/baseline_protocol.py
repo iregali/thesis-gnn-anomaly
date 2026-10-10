@@ -754,10 +754,14 @@ def main():
             if a is not None and b is not None:
                 for name, first in [("OCSVM (subgroup-calibrated)", "ocsvm"), ("PEER -> OCSVM", "peer")]:
                     seed_scores, seed_rows = [], []
-                    for (pv, pt), (ov, ot) in zip(a, b):
+                    for seed, ((pv, pt), (ov, ot)) in zip(args.seeds, zip(a, b)):
                         av = np.where(np.isnan(pv), np.nan, ov) if first == "ocsvm" else pv
                         at = np.where(np.isnan(pt), np.nan, ot) if first == "ocsvm" else pt
                         sc = combine(av, at, ov, ot, y_val)
+                        if args.save_scores:
+                            score_rows.append(pd.DataFrame({"level": level, "features": set_name, "detector": name,
+                                                            "variant": "combined", "seed": seed, "path": test_paths,
+                                                            "score": sc}))
                         seed_scores.append(to_ranks(sc))
                         seed_rows.append(point_metrics(sc, y, w, hard, gd_fpr))
                     rows.append(summarise(level, f"{name} ({set_name})", "combined", set_name, name,
