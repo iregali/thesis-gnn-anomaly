@@ -1,5 +1,0 @@
-level,encoder,depth,val_pauc,chosen
-0.0,gps,1,0.7722417206123476,False
-0.0,gps,2,0.7831090041879591,True
-0.01,gps,1,0.6211375867006386,False
-0.01,gps,2,0.6746797793972765,True

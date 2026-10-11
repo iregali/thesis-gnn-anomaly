@@ -1,8 +1,0 @@
-method,setting,val_pauc
-IsolationForest (static features),"300 trees, 5 seeds",
-LOF (static features),"binary_raw, n_neighbors=10",0.7076165648412907
-OneClassSVM (static features),"scale_all, nu=0.01, gamma=1.0/n_features",0.7310950270391777
-IsolationForest (static + GuardDog features),"300 trees, 5 seeds",
-LOF (static + GuardDog features),"binary_raw, n_neighbors=100",0.7037603222708331
-OneClassSVM (static + GuardDog features),"scale_all, nu=0.05, gamma=1.0/n_features",0.8551610154934024
-RandomForest (supervised reference),"300 trees, class_weight=balanced",

@@ -1,0 +1,328 @@
+run,method,setting,val_pauc,level,features,variant
+baseline_chosen_settings,IsolationForest (static features),"300 trees, 5 seeds",,,,
+baseline_chosen_settings,LOF (static features),"scale_all, n_neighbors=100",0.8757973362990328,,,
+baseline_chosen_settings,OneClassSVM (static features),"scale_all, nu=0.01, gamma=1.0/n_features",0.8463528523271036,,,
+baseline_chosen_settings,IsolationForest (static + GuardDog features),"300 trees, 5 seeds",,,,
+baseline_chosen_settings,LOF (static + GuardDog features),"binary_raw, n_neighbors=35",0.8374804636059587,,,
+baseline_chosen_settings,OneClassSVM (static + GuardDog features),"scale_all, nu=0.05, gamma=1.0/n_features",0.9361170155333524,,,
+baseline_chosen_settings,RandomForest (supervised reference),"300 trees, class_weight=balanced",,,,
+baseline_chosen_settings_splits,IsolationForest (static features),"300 trees, 5 seeds",,,,
+baseline_chosen_settings_splits,LOF (static features),"scale_all, n_neighbors=100",0.8757973362990328,,,
+baseline_chosen_settings_splits,OneClassSVM (static features),"scale_all, nu=0.01, gamma=1.0/n_features",0.8463528523271036,,,
+baseline_chosen_settings_splits,IsolationForest (static + GuardDog features),"300 trees, 5 seeds",,,,
+baseline_chosen_settings_splits,LOF (static + GuardDog features),"binary_raw, n_neighbors=35",0.8374804636059587,,,
+baseline_chosen_settings_splits,OneClassSVM (static + GuardDog features),"scale_all, nu=0.05, gamma=1.0/n_features",0.9361170155333524,,,
+baseline_chosen_settings_splits,RandomForest (supervised reference),"300 trees, class_weight=balanced",,,,
+baseline_chosen_settings_splits_campaign,IsolationForest (static features),"300 trees, 5 seeds",,,,
+baseline_chosen_settings_splits_campaign,LOF (static features),"binary_raw, n_neighbors=10",0.7076165648412907,,,
+baseline_chosen_settings_splits_campaign,OneClassSVM (static features),"scale_all, nu=0.01, gamma=1.0/n_features",0.7310950270391777,,,
+baseline_chosen_settings_splits_campaign,IsolationForest (static + GuardDog features),"300 trees, 5 seeds",,,,
+baseline_chosen_settings_splits_campaign,LOF (static + GuardDog features),"binary_raw, n_neighbors=100",0.7037603222708331,,,
+baseline_chosen_settings_splits_campaign,OneClassSVM (static + GuardDog features),"scale_all, nu=0.05, gamma=1.0/n_features",0.8551610154934024,,,
+baseline_chosen_settings_splits_campaign,RandomForest (supervised reference),"300 trees, class_weight=balanced",,,,
+baseline_protocol_settings,IF,{'mode': 'raw'},0.6442131071321725,0.0,static+deps+names,
+baseline_protocol_settings,LOF,"{'mode': 'scale_all', 'k': 100}",0.6658439635334058,0.0,static+deps+names,
+baseline_protocol_settings,OCSVM,"{'mode': 'scale_all', 'nu': 0.01, 'g': 1.0}",0.7314829101017853,0.0,static+deps+names,
+baseline_protocol_settings,IF,{'mode': 'raw'},0.7394290480330752,0.0,static+deps+names+GuardDog,
+baseline_protocol_settings,LOF,"{'mode': 'binary_raw', 'k': 100}",0.6875049373421303,0.0,static+deps+names+GuardDog,
+baseline_protocol_settings,OCSVM,"{'mode': 'scale_all', 'nu': 0.05, 'g': 1.0}",0.8550495325092216,0.0,static+deps+names+GuardDog,
+baseline_protocol_settings,IF,{'mode': 'raw'},0.6431738136914098,0.01,static+deps+names,
+baseline_protocol_settings,LOF,"{'mode': 'scale_all', 'k': 100}",0.6232278319334508,0.01,static+deps+names,
+baseline_protocol_settings,OCSVM,"{'mode': 'scale_all', 'nu': 0.05, 'g': 0.1}",0.6133777395076204,0.01,static+deps+names,
+baseline_protocol_settings,IF,{'mode': 'raw'},0.7542300536387384,0.01,static+deps+names+GuardDog,
+baseline_protocol_settings,LOF,"{'mode': 'scale_all', 'k': 10}",0.5982617155348927,0.01,static+deps+names+GuardDog,
+baseline_protocol_settings,OCSVM,"{'mode': 'scale_all', 'nu': 0.1, 'g': 0.1}",0.7855827606016462,0.01,static+deps+names+GuardDog,
+baseline_protocol_settings,IF,{'mode': 'raw'},0.6428476227376954,0.02,static+deps+names,
+baseline_protocol_settings,LOF,"{'mode': 'binary_raw', 'k': 10}",0.5912528604706051,0.02,static+deps+names,
+baseline_protocol_settings,OCSVM,"{'mode': 'scale_all', 'nu': 0.05, 'g': 0.1}",0.6075437062178055,0.02,static+deps+names,
+baseline_protocol_settings,IF,{'mode': 'raw'},0.755453694759225,0.02,static+deps+names+GuardDog,
+baseline_protocol_settings,LOF,"{'mode': 'binary_raw', 'k': 10}",0.5937749504656692,0.02,static+deps+names+GuardDog,
+baseline_protocol_settings,OCSVM,"{'mode': 'scale_all', 'nu': 0.1, 'g': 0.1}",0.7551141452779944,0.02,static+deps+names+GuardDog,
+baseline_protocol_settings,IF,{'mode': 'raw'},0.606214168406463,0.05,static+deps+names,
+baseline_protocol_settings,LOF,"{'mode': 'scale_all', 'k': 35}",0.5777481177986531,0.05,static+deps+names,
+baseline_protocol_settings,OCSVM,"{'mode': 'scale_all', 'nu': 0.01, 'g': 1.0}",0.5814605740365724,0.05,static+deps+names,
+baseline_protocol_settings,IF,{'mode': 'raw'},0.7401963132771437,0.05,static+deps+names+GuardDog,
+baseline_protocol_settings,LOF,"{'mode': 'binary_raw', 'k': 35}",0.6108932962719203,0.05,static+deps+names+GuardDog,
+baseline_protocol_settings,OCSVM,"{'mode': 'scale_all', 'nu': 0.01, 'g': 0.1}",0.6499052971479969,0.05,static+deps+names+GuardDog,
+baseline_protocol_settings_conn,IF,"{'mode': 'raw', 'trim': 0.0}",0.6442131071321725,0.0,static+deps+names,naive
+baseline_protocol_settings_conn,LOF,"{'mode': 'scale_all', 'k': 100, 'trim': 0.0}",0.6658439635334058,0.0,static+deps+names,naive
+baseline_protocol_settings_conn,OCSVM,"{'mode': 'scale_all', 'nu': 0.01, 'g': 1.0, 'trim': 0.0}",0.7314829101017853,0.0,static+deps+names,naive
+baseline_protocol_settings_conn,PEER,"{'mode': 'scale_all', 'k': 50}",0.6172726794736364,0.0,static+deps+names,naive
+baseline_protocol_settings_conn,IF,"{'mode': 'raw', 'trim': 0.0}",0.7394290480330752,0.0,static+deps+names+GuardDog,naive
+baseline_protocol_settings_conn,LOF,"{'mode': 'binary_raw', 'k': 100, 'trim': 0.0}",0.6875049373421303,0.0,static+deps+names+GuardDog,naive
+baseline_protocol_settings_conn,OCSVM,"{'mode': 'scale_all', 'nu': 0.05, 'g': 1.0, 'trim': 0.0}",0.8550495325092216,0.0,static+deps+names+GuardDog,naive
+baseline_protocol_settings_conn,PEER,"{'mode': 'scale_all', 'k': 50}",0.746213382577019,0.0,static+deps+names+GuardDog,naive
+baseline_protocol_settings_conn,IF,"{'mode': 'raw', 'trim': 0.0}",0.6431738136914098,0.01,static+deps+names,naive
+baseline_protocol_settings_conn,LOF,"{'mode': 'scale_all', 'k': 100, 'trim': 0.0}",0.6232278319334508,0.01,static+deps+names,naive
+baseline_protocol_settings_conn,OCSVM,"{'mode': 'scale_all', 'nu': 0.05, 'g': 0.1, 'trim': 0.0}",0.6133777395076204,0.01,static+deps+names,naive
+baseline_protocol_settings_conn,PEER,"{'mode': 'scale_all', 'k': 50}",0.6099700405920502,0.01,static+deps+names,naive
+baseline_protocol_settings_conn,IF,"{'mode': 'raw', 'trim': 0.0}",0.7542300536387384,0.01,static+deps+names+GuardDog,naive
+baseline_protocol_settings_conn,LOF,"{'mode': 'scale_all', 'k': 10, 'trim': 0.0}",0.5982617155348927,0.01,static+deps+names+GuardDog,naive
+baseline_protocol_settings_conn,OCSVM,"{'mode': 'scale_all', 'nu': 0.1, 'g': 0.1, 'trim': 0.0}",0.7855827606016462,0.01,static+deps+names+GuardDog,naive
+baseline_protocol_settings_conn,PEER,"{'mode': 'scale_all', 'k': 50}",0.719244073311059,0.01,static+deps+names+GuardDog,naive
+baseline_protocol_settings_conn,IF,"{'mode': 'raw', 'trim': 0.0}",0.6428476227376954,0.02,static+deps+names,naive
+baseline_protocol_settings_conn,LOF,"{'mode': 'binary_raw', 'k': 10, 'trim': 0.0}",0.5912528604706051,0.02,static+deps+names,naive
+baseline_protocol_settings_conn,OCSVM,"{'mode': 'scale_all', 'nu': 0.05, 'g': 0.1, 'trim': 0.0}",0.6075437062178055,0.02,static+deps+names,naive
+baseline_protocol_settings_conn,PEER,"{'mode': 'scale_all', 'k': 50}",0.6057212325154908,0.02,static+deps+names,naive
+baseline_protocol_settings_conn,IF,"{'mode': 'raw', 'trim': 0.0}",0.755453694759225,0.02,static+deps+names+GuardDog,naive
+baseline_protocol_settings_conn,LOF,"{'mode': 'binary_raw', 'k': 10, 'trim': 0.0}",0.5937749504656692,0.02,static+deps+names+GuardDog,naive
+baseline_protocol_settings_conn,OCSVM,"{'mode': 'scale_all', 'nu': 0.1, 'g': 0.1, 'trim': 0.0}",0.7551141452779944,0.02,static+deps+names+GuardDog,naive
+baseline_protocol_settings_conn,PEER,"{'mode': 'scale_all', 'k': 50}",0.702052333631281,0.02,static+deps+names+GuardDog,naive
+baseline_protocol_settings_conn,IF,"{'mode': 'raw', 'trim': 0.0}",0.606214168406463,0.05,static+deps+names,naive
+baseline_protocol_settings_conn,LOF,"{'mode': 'scale_all', 'k': 35, 'trim': 0.0}",0.5777481177986531,0.05,static+deps+names,naive
+baseline_protocol_settings_conn,OCSVM,"{'mode': 'scale_all', 'nu': 0.01, 'g': 1.0, 'trim': 0.0}",0.5814605740365724,0.05,static+deps+names,naive
+baseline_protocol_settings_conn,PEER,"{'mode': 'scale_all', 'k': 50}",0.5686822481080854,0.05,static+deps+names,naive
+baseline_protocol_settings_conn,IF,"{'mode': 'raw', 'trim': 0.0}",0.7401963132771437,0.05,static+deps+names+GuardDog,naive
+baseline_protocol_settings_conn,LOF,"{'mode': 'binary_raw', 'k': 35, 'trim': 0.0}",0.6108932962719203,0.05,static+deps+names+GuardDog,naive
+baseline_protocol_settings_conn,OCSVM,"{'mode': 'scale_all', 'nu': 0.01, 'g': 0.1, 'trim': 0.0}",0.6499052971479969,0.05,static+deps+names+GuardDog,naive
+baseline_protocol_settings_conn,PEER,"{'mode': 'scale_all', 'k': 50}",0.6519323313581686,0.05,static+deps+names+GuardDog,naive
+baseline_protocol_settings_expl,OCSVM,"{'mode': 'scale_all', 'nu': 0.1, 'g': 0.1, 'trim': 0.0}",0.7855827606016462,0.01,static+deps+names+GuardDog,naive
+baseline_protocol_settings_expl,PEER,"{'mode': 'scale_all', 'k': 50}",0.719244073311059,0.01,static+deps+names+GuardDog,naive
+baseline_protocol_settings_expl,IF,"{'mode': 'raw', 'trim': 0.0}",0.7542300536387384,0.01,static+deps+names+GuardDog,naive
+baseline_protocol_settings_expl,OCSVM,"{'mode': 'scale_all', 'nu': 0.1, 'g': 0.1, 'trim': 0.0}",0.7551141452779944,0.02,static+deps+names+GuardDog,naive
+baseline_protocol_settings_expl,PEER,"{'mode': 'scale_all', 'k': 50}",0.702052333631281,0.02,static+deps+names+GuardDog,naive
+baseline_protocol_settings_expl,IF,"{'mode': 'raw', 'trim': 0.0}",0.755453694759225,0.02,static+deps+names+GuardDog,naive
+baseline_protocol_settings_expl,OCSVM,"{'mode': 'scale_all', 'nu': 0.01, 'g': 0.1, 'trim': 0.0}",0.6499052971479969,0.05,static+deps+names+GuardDog,naive
+baseline_protocol_settings_expl,PEER,"{'mode': 'scale_all', 'k': 50}",0.6519323313581686,0.05,static+deps+names+GuardDog,naive
+baseline_protocol_settings_expl,IF,"{'mode': 'raw', 'trim': 0.0}",0.7401963132771437,0.05,static+deps+names+GuardDog,naive
+baseline_protocol_settings_primary,OCSVM,"{'mode': 'scale_all', 'nu': 0.05, 'g': 1.0, 'trim': 0.0}",0.8550495325092216,0.0,static+deps+names+GuardDog,naive
+baseline_protocol_settings_robust,IF,"{'mode': 'raw', 'trim': 0.0}",0.6374777375584899,0.0,static,naive
+baseline_protocol_settings_robust,IF,"{'mode': 'raw', 'trim': 0.0}",0.6374777375584899,0.0,static,robust
+baseline_protocol_settings_robust,LOF,"{'mode': 'binary_raw', 'k': 10, 'trim': 0.0}",0.7076165648412907,0.0,static,naive
+baseline_protocol_settings_robust,LOF,"{'mode': 'binary_raw', 'k': 10, 'trim': 0.0}",0.7076165648412907,0.0,static,robust
+baseline_protocol_settings_robust,OCSVM,"{'mode': 'scale_all', 'nu': 0.01, 'g': 1.0, 'trim': 0.0}",0.7310950270391777,0.0,static,naive
+baseline_protocol_settings_robust,OCSVM,"{'mode': 'scale_all', 'nu': 0.01, 'g': 1.0, 'trim': 0.0}",0.7310950270391777,0.0,static,robust
+baseline_protocol_settings_robust,IF,"{'mode': 'raw', 'trim': 0.0}",0.7696844126811044,0.0,static+GuardDog,naive
+baseline_protocol_settings_robust,IF,"{'mode': 'raw', 'trim': 0.0}",0.7696844126811044,0.0,static+GuardDog,robust
+baseline_protocol_settings_robust,LOF,"{'mode': 'binary_raw', 'k': 100, 'trim': 0.0}",0.7037603222708331,0.0,static+GuardDog,naive
+baseline_protocol_settings_robust,LOF,"{'mode': 'robust', 'k': 35, 'trim': 0.0}",0.8113868209989494,0.0,static+GuardDog,robust
+baseline_protocol_settings_robust,OCSVM,"{'mode': 'scale_all', 'nu': 0.05, 'g': 1.0, 'trim': 0.0}",0.8551610154934024,0.0,static+GuardDog,naive
+baseline_protocol_settings_robust,OCSVM,"{'mode': 'scale_all', 'nu': 0.05, 'g': 1.0, 'trim': 0.0}",0.8551610154934024,0.0,static+GuardDog,robust
+baseline_protocol_settings_robust,IF,"{'mode': 'raw', 'trim': 0.0}",0.6442131071321725,0.0,static+deps+names,naive
+baseline_protocol_settings_robust,IF,"{'mode': 'raw', 'trim': 0.0}",0.6442131071321725,0.0,static+deps+names,robust
+baseline_protocol_settings_robust,LOF,"{'mode': 'scale_all', 'k': 100, 'trim': 0.0}",0.6658439635334058,0.0,static+deps+names,naive
+baseline_protocol_settings_robust,LOF,"{'mode': 'robust', 'k': 35, 'trim': 0.0}",0.666834194745836,0.0,static+deps+names,robust
+baseline_protocol_settings_robust,OCSVM,"{'mode': 'scale_all', 'nu': 0.01, 'g': 1.0, 'trim': 0.0}",0.7314829101017853,0.0,static+deps+names,naive
+baseline_protocol_settings_robust,OCSVM,"{'mode': 'scale_all', 'nu': 0.01, 'g': 1.0, 'trim': 0.0}",0.7314829101017853,0.0,static+deps+names,robust
+baseline_protocol_settings_robust,IF,"{'mode': 'raw', 'trim': 0.0}",0.7394290480330752,0.0,static+deps+names+GuardDog,naive
+baseline_protocol_settings_robust,IF,"{'mode': 'raw', 'trim': 0.0}",0.7394290480330752,0.0,static+deps+names+GuardDog,robust
+baseline_protocol_settings_robust,LOF,"{'mode': 'binary_raw', 'k': 100, 'trim': 0.0}",0.6875049373421303,0.0,static+deps+names+GuardDog,naive
+baseline_protocol_settings_robust,LOF,"{'mode': 'robust', 'k': 35, 'trim': 0.0}",0.7880407296646323,0.0,static+deps+names+GuardDog,robust
+baseline_protocol_settings_robust,OCSVM,"{'mode': 'scale_all', 'nu': 0.05, 'g': 1.0, 'trim': 0.0}",0.8550495325092216,0.0,static+deps+names+GuardDog,naive
+baseline_protocol_settings_robust,OCSVM,"{'mode': 'scale_all', 'nu': 0.05, 'g': 1.0, 'trim': 0.0}",0.8550495325092216,0.0,static+deps+names+GuardDog,robust
+baseline_protocol_settings_robust,IF,"{'mode': 'raw', 'trim': 0.0}",0.6315504374583798,0.01,static,naive
+baseline_protocol_settings_robust,IF,"{'mode': 'raw', 'trim': 0.01}",0.6382049272200097,0.01,static,robust
+baseline_protocol_settings_robust,IF,"{'mode': 'raw', 'trim': 0.0}",,0.01,static,fixed
+baseline_protocol_settings_robust,LOF,"{'mode': 'scale_all', 'k': 100, 'trim': 0.0}",0.616966568645435,0.01,static,naive
+baseline_protocol_settings_robust,LOF,"{'mode': 'scale_all', 'k': 100, 'trim': 0.05}",0.6443347911737294,0.01,static,robust
+baseline_protocol_settings_robust,LOF,"{'mode': 'binary_raw', 'k': 10, 'trim': 0.0}",,0.01,static,fixed
+baseline_protocol_settings_robust,OCSVM,"{'mode': 'scale_all', 'nu': 0.05, 'g': 1.0, 'trim': 0.0}",0.6047673184352962,0.01,static,naive
+baseline_protocol_settings_robust,OCSVM,"{'mode': 'scale_all', 'nu': 0.01, 'g': 1.0, 'trim': 0.05}",0.6166998838597474,0.01,static,robust
+baseline_protocol_settings_robust,OCSVM,"{'mode': 'scale_all', 'nu': 0.01, 'g': 1.0, 'trim': 0.0}",,0.01,static,fixed
+baseline_protocol_settings_robust,IF,"{'mode': 'raw', 'trim': 0.0}",0.7680634160875897,0.01,static+GuardDog,naive
+baseline_protocol_settings_robust,IF,"{'mode': 'raw', 'trim': 0.0}",0.7680634160875897,0.01,static+GuardDog,robust
+baseline_protocol_settings_robust,IF,"{'mode': 'raw', 'trim': 0.0}",,0.01,static+GuardDog,fixed
+baseline_protocol_settings_robust,LOF,"{'mode': 'binary_raw', 'k': 35, 'trim': 0.0}",0.603844851389721,0.01,static+GuardDog,naive
+baseline_protocol_settings_robust,LOF,"{'mode': 'robust', 'k': 100, 'trim': 0.05}",0.7033464508001485,0.01,static+GuardDog,robust
+baseline_protocol_settings_robust,LOF,"{'mode': 'binary_raw', 'k': 100, 'trim': 0.0}",,0.01,static+GuardDog,fixed
+baseline_protocol_settings_robust,OCSVM,"{'mode': 'scale_all', 'nu': 0.1, 'g': 0.1, 'trim': 0.0}",0.7823871579374457,0.01,static+GuardDog,naive
+baseline_protocol_settings_robust,OCSVM,"{'mode': 'scale_all', 'nu': 0.05, 'g': 0.1, 'trim': 0.02}",0.7954685567282926,0.01,static+GuardDog,robust
+baseline_protocol_settings_robust,OCSVM,"{'mode': 'scale_all', 'nu': 0.05, 'g': 1.0, 'trim': 0.0}",,0.01,static+GuardDog,fixed
+baseline_protocol_settings_robust,IF,"{'mode': 'raw', 'trim': 0.0}",0.6431738136914098,0.01,static+deps+names,naive
+baseline_protocol_settings_robust,IF,"{'mode': 'raw', 'trim': 0.0}",0.6431738136914098,0.01,static+deps+names,robust
+baseline_protocol_settings_robust,IF,"{'mode': 'raw', 'trim': 0.0}",,0.01,static+deps+names,fixed
+baseline_protocol_settings_robust,LOF,"{'mode': 'scale_all', 'k': 100, 'trim': 0.0}",0.6232278319334508,0.01,static+deps+names,naive
+baseline_protocol_settings_robust,LOF,"{'mode': 'scale_all', 'k': 100, 'trim': 0.02}",0.6345842804984747,0.01,static+deps+names,robust
+baseline_protocol_settings_robust,LOF,"{'mode': 'scale_all', 'k': 100, 'trim': 0.0}",,0.01,static+deps+names,fixed
+baseline_protocol_settings_robust,OCSVM,"{'mode': 'scale_all', 'nu': 0.05, 'g': 0.1, 'trim': 0.0}",0.6133777395076204,0.01,static+deps+names,naive
+baseline_protocol_settings_robust,OCSVM,"{'mode': 'scale_all', 'nu': 0.05, 'g': 0.1, 'trim': 0.01}",0.6163843797280458,0.01,static+deps+names,robust
+baseline_protocol_settings_robust,OCSVM,"{'mode': 'scale_all', 'nu': 0.01, 'g': 1.0, 'trim': 0.0}",,0.01,static+deps+names,fixed
+baseline_protocol_settings_robust,IF,"{'mode': 'raw', 'trim': 0.0}",0.7542300536387384,0.01,static+deps+names+GuardDog,naive
+baseline_protocol_settings_robust,IF,"{'mode': 'raw', 'trim': 0.0}",0.7542300536387384,0.01,static+deps+names+GuardDog,robust
+baseline_protocol_settings_robust,IF,"{'mode': 'raw', 'trim': 0.0}",,0.01,static+deps+names+GuardDog,fixed
+baseline_protocol_settings_robust,LOF,"{'mode': 'scale_all', 'k': 10, 'trim': 0.0}",0.5982617155348927,0.01,static+deps+names+GuardDog,naive
+baseline_protocol_settings_robust,LOF,"{'mode': 'robust', 'k': 100, 'trim': 0.05}",0.7191199572089931,0.01,static+deps+names+GuardDog,robust
+baseline_protocol_settings_robust,LOF,"{'mode': 'binary_raw', 'k': 100, 'trim': 0.0}",,0.01,static+deps+names+GuardDog,fixed
+baseline_protocol_settings_robust,OCSVM,"{'mode': 'scale_all', 'nu': 0.1, 'g': 0.1, 'trim': 0.0}",0.7855827606016462,0.01,static+deps+names+GuardDog,naive
+baseline_protocol_settings_robust,OCSVM,"{'mode': 'scale_all', 'nu': 0.1, 'g': 0.1, 'trim': 0.02}",0.7923574771109221,0.01,static+deps+names+GuardDog,robust
+baseline_protocol_settings_robust,OCSVM,"{'mode': 'scale_all', 'nu': 0.05, 'g': 1.0, 'trim': 0.0}",,0.01,static+deps+names+GuardDog,fixed
+baseline_protocol_settings_robust,IF,"{'mode': 'raw', 'trim': 0.0}",0.6360362309983295,0.02,static,naive
+baseline_protocol_settings_robust,IF,"{'mode': 'raw', 'trim': 0.0}",0.6360362309983295,0.02,static,robust
+baseline_protocol_settings_robust,IF,"{'mode': 'raw', 'trim': 0.0}",,0.02,static,fixed
+baseline_protocol_settings_robust,LOF,"{'mode': 'binary_raw', 'k': 35, 'trim': 0.0}",0.5952553181967858,0.02,static,naive
+baseline_protocol_settings_robust,LOF,"{'mode': 'binary_raw', 'k': 35, 'trim': 0.01}",0.5992077421653602,0.02,static,robust
+baseline_protocol_settings_robust,LOF,"{'mode': 'binary_raw', 'k': 10, 'trim': 0.0}",,0.02,static,fixed
+baseline_protocol_settings_robust,OCSVM,"{'mode': 'scale_all', 'nu': 0.05, 'g': 1.0, 'trim': 0.0}",0.5944555067220414,0.02,static,naive
+baseline_protocol_settings_robust,OCSVM,"{'mode': 'scale_all', 'nu': 0.01, 'g': 1.0, 'trim': 0.05}",0.6031574944284315,0.02,static,robust
+baseline_protocol_settings_robust,OCSVM,"{'mode': 'scale_all', 'nu': 0.01, 'g': 1.0, 'trim': 0.0}",,0.02,static,fixed
+baseline_protocol_settings_robust,IF,"{'mode': 'raw', 'trim': 0.0}",0.7546383388160981,0.02,static+GuardDog,naive
+baseline_protocol_settings_robust,IF,"{'mode': 'raw', 'trim': 0.01}",0.7654925067465117,0.02,static+GuardDog,robust
+baseline_protocol_settings_robust,IF,"{'mode': 'raw', 'trim': 0.0}",,0.02,static+GuardDog,fixed
+baseline_protocol_settings_robust,LOF,"{'mode': 'binary_raw', 'k': 35, 'trim': 0.0}",0.6690045911437456,0.02,static+GuardDog,naive
+baseline_protocol_settings_robust,LOF,"{'mode': 'binary_raw', 'k': 35, 'trim': 0.05}",0.7118288728906353,0.02,static+GuardDog,robust
+baseline_protocol_settings_robust,LOF,"{'mode': 'binary_raw', 'k': 100, 'trim': 0.0}",,0.02,static+GuardDog,fixed
+baseline_protocol_settings_robust,OCSVM,"{'mode': 'scale_all', 'nu': 0.1, 'g': 0.1, 'trim': 0.0}",0.7507947261262014,0.02,static+GuardDog,naive
+baseline_protocol_settings_robust,OCSVM,"{'mode': 'scale_all', 'nu': 0.05, 'g': 0.1, 'trim': 0.05}",0.7665580314776699,0.02,static+GuardDog,robust
+baseline_protocol_settings_robust,OCSVM,"{'mode': 'scale_all', 'nu': 0.05, 'g': 1.0, 'trim': 0.0}",,0.02,static+GuardDog,fixed
+baseline_protocol_settings_robust,IF,"{'mode': 'raw', 'trim': 0.0}",0.6428476227376954,0.02,static+deps+names,naive
+baseline_protocol_settings_robust,IF,"{'mode': 'raw', 'trim': 0.0}",0.6428476227376954,0.02,static+deps+names,robust
+baseline_protocol_settings_robust,IF,"{'mode': 'raw', 'trim': 0.0}",,0.02,static+deps+names,fixed
+baseline_protocol_settings_robust,LOF,"{'mode': 'binary_raw', 'k': 10, 'trim': 0.0}",0.5912528604706051,0.02,static+deps+names,naive
+baseline_protocol_settings_robust,LOF,"{'mode': 'binary_raw', 'k': 10, 'trim': 0.05}",0.6038608816227405,0.02,static+deps+names,robust
+baseline_protocol_settings_robust,LOF,"{'mode': 'scale_all', 'k': 100, 'trim': 0.0}",,0.02,static+deps+names,fixed
+baseline_protocol_settings_robust,OCSVM,"{'mode': 'scale_all', 'nu': 0.05, 'g': 0.1, 'trim': 0.0}",0.6075437062178055,0.02,static+deps+names,naive
+baseline_protocol_settings_robust,OCSVM,"{'mode': 'scale_all', 'nu': 0.05, 'g': 0.1, 'trim': 0.01}",0.6127071414263058,0.02,static+deps+names,robust
+baseline_protocol_settings_robust,OCSVM,"{'mode': 'scale_all', 'nu': 0.01, 'g': 1.0, 'trim': 0.0}",,0.02,static+deps+names,fixed
+baseline_protocol_settings_robust,IF,"{'mode': 'raw', 'trim': 0.0}",0.755453694759225,0.02,static+deps+names+GuardDog,naive
+baseline_protocol_settings_robust,IF,"{'mode': 'raw', 'trim': 0.0}",0.755453694759225,0.02,static+deps+names+GuardDog,robust
+baseline_protocol_settings_robust,IF,"{'mode': 'raw', 'trim': 0.0}",,0.02,static+deps+names+GuardDog,fixed
+baseline_protocol_settings_robust,LOF,"{'mode': 'binary_raw', 'k': 10, 'trim': 0.0}",0.5937749504656692,0.02,static+deps+names+GuardDog,naive
+baseline_protocol_settings_robust,LOF,"{'mode': 'binary_raw', 'k': 10, 'trim': 0.05}",0.6065226289509287,0.02,static+deps+names+GuardDog,robust
+baseline_protocol_settings_robust,LOF,"{'mode': 'binary_raw', 'k': 100, 'trim': 0.0}",,0.02,static+deps+names+GuardDog,fixed
+baseline_protocol_settings_robust,OCSVM,"{'mode': 'scale_all', 'nu': 0.1, 'g': 0.1, 'trim': 0.0}",0.7551141452779944,0.02,static+deps+names+GuardDog,naive
+baseline_protocol_settings_robust,OCSVM,"{'mode': 'scale_all', 'nu': 0.1, 'g': 0.1, 'trim': 0.05}",0.769820183897133,0.02,static+deps+names+GuardDog,robust
+baseline_protocol_settings_robust,OCSVM,"{'mode': 'scale_all', 'nu': 0.05, 'g': 1.0, 'trim': 0.0}",,0.02,static+deps+names+GuardDog,fixed
+baseline_protocol_settings_robust,IF,"{'mode': 'raw', 'trim': 0.0}",0.5777979086739409,0.05,static,naive
+baseline_protocol_settings_robust,IF,"{'mode': 'raw', 'trim': 0.0}",0.5777979086739409,0.05,static,robust
+baseline_protocol_settings_robust,IF,"{'mode': 'raw', 'trim': 0.0}",,0.05,static,fixed
+baseline_protocol_settings_robust,LOF,"{'mode': 'binary_raw', 'k': 35, 'trim': 0.0}",0.5701573166992948,0.05,static,naive
+baseline_protocol_settings_robust,LOF,"{'mode': 'robust', 'k': 35, 'trim': 0.05}",0.5844298103799523,0.05,static,robust
+baseline_protocol_settings_robust,LOF,"{'mode': 'binary_raw', 'k': 10, 'trim': 0.0}",,0.05,static,fixed
+baseline_protocol_settings_robust,OCSVM,"{'mode': 'binary_raw', 'nu': 0.01, 'g': 1.0, 'trim': 0.0}",0.57861132155852,0.05,static,naive
+baseline_protocol_settings_robust,OCSVM,"{'mode': 'binary_raw', 'nu': 0.01, 'g': 1.0, 'trim': 0.0}",0.57861132155852,0.05,static,robust
+baseline_protocol_settings_robust,OCSVM,"{'mode': 'scale_all', 'nu': 0.01, 'g': 1.0, 'trim': 0.0}",,0.05,static,fixed
+baseline_protocol_settings_robust,IF,"{'mode': 'raw', 'trim': 0.0}",0.7166357568556114,0.05,static+GuardDog,naive
+baseline_protocol_settings_robust,IF,"{'mode': 'raw', 'trim': 0.05}",0.7180580757126122,0.05,static+GuardDog,robust
+baseline_protocol_settings_robust,IF,"{'mode': 'raw', 'trim': 0.0}",,0.05,static+GuardDog,fixed
+baseline_protocol_settings_robust,LOF,"{'mode': 'binary_raw', 'k': 100, 'trim': 0.0}",0.654602155422703,0.05,static+GuardDog,naive
+baseline_protocol_settings_robust,LOF,"{'mode': 'binary_raw', 'k': 100, 'trim': 0.02}",0.6884028732735393,0.05,static+GuardDog,robust
+baseline_protocol_settings_robust,LOF,"{'mode': 'binary_raw', 'k': 100, 'trim': 0.0}",,0.05,static+GuardDog,fixed
+baseline_protocol_settings_robust,OCSVM,"{'mode': 'scale_all', 'nu': 0.05, 'g': 0.1, 'trim': 0.0}",0.6499254563804304,0.05,static+GuardDog,naive
+baseline_protocol_settings_robust,OCSVM,"{'mode': 'scale_all', 'nu': 0.05, 'g': 0.1, 'trim': 0.0}",0.6499254563804304,0.05,static+GuardDog,robust
+baseline_protocol_settings_robust,OCSVM,"{'mode': 'scale_all', 'nu': 0.05, 'g': 1.0, 'trim': 0.0}",,0.05,static+GuardDog,fixed
+baseline_protocol_settings_robust,IF,"{'mode': 'raw', 'trim': 0.0}",0.606214168406463,0.05,static+deps+names,naive
+baseline_protocol_settings_robust,IF,"{'mode': 'raw', 'trim': 0.0}",0.606214168406463,0.05,static+deps+names,robust
+baseline_protocol_settings_robust,IF,"{'mode': 'raw', 'trim': 0.0}",,0.05,static+deps+names,fixed
+baseline_protocol_settings_robust,LOF,"{'mode': 'scale_all', 'k': 35, 'trim': 0.0}",0.5777481177986531,0.05,static+deps+names,naive
+baseline_protocol_settings_robust,LOF,"{'mode': 'scale_all', 'k': 35, 'trim': 0.05}",0.5883613464691377,0.05,static+deps+names,robust
+baseline_protocol_settings_robust,LOF,"{'mode': 'scale_all', 'k': 100, 'trim': 0.0}",,0.05,static+deps+names,fixed
+baseline_protocol_settings_robust,OCSVM,"{'mode': 'scale_all', 'nu': 0.01, 'g': 1.0, 'trim': 0.0}",0.5814605740365724,0.05,static+deps+names,naive
+baseline_protocol_settings_robust,OCSVM,"{'mode': 'scale_all', 'nu': 0.01, 'g': 1.0, 'trim': 0.0}",0.5814605740365724,0.05,static+deps+names,robust
+baseline_protocol_settings_robust,OCSVM,"{'mode': 'scale_all', 'nu': 0.01, 'g': 1.0, 'trim': 0.0}",,0.05,static+deps+names,fixed
+baseline_protocol_settings_robust,IF,"{'mode': 'raw', 'trim': 0.0}",0.7401963132771437,0.05,static+deps+names+GuardDog,naive
+baseline_protocol_settings_robust,IF,"{'mode': 'raw', 'trim': 0.0}",0.7401963132771437,0.05,static+deps+names+GuardDog,robust
+baseline_protocol_settings_robust,IF,"{'mode': 'raw', 'trim': 0.0}",,0.05,static+deps+names+GuardDog,fixed
+baseline_protocol_settings_robust,LOF,"{'mode': 'binary_raw', 'k': 35, 'trim': 0.0}",0.6108932962719203,0.05,static+deps+names+GuardDog,naive
+baseline_protocol_settings_robust,LOF,"{'mode': 'scale_all', 'k': 35, 'trim': 0.02}",0.6296037356757875,0.05,static+deps+names+GuardDog,robust
+baseline_protocol_settings_robust,LOF,"{'mode': 'binary_raw', 'k': 100, 'trim': 0.0}",,0.05,static+deps+names+GuardDog,fixed
+baseline_protocol_settings_robust,OCSVM,"{'mode': 'scale_all', 'nu': 0.01, 'g': 0.1, 'trim': 0.0}",0.6499052971479969,0.05,static+deps+names+GuardDog,naive
+baseline_protocol_settings_robust,OCSVM,"{'mode': 'scale_all', 'nu': 0.01, 'g': 0.1, 'trim': 0.0}",0.6499052971479969,0.05,static+deps+names+GuardDog,robust
+baseline_protocol_settings_robust,OCSVM,"{'mode': 'scale_all', 'nu': 0.05, 'g': 1.0, 'trim': 0.0}",,0.05,static+deps+names+GuardDog,fixed
+baseline_protocol_settings_salt1,IF,"{'mode': 'raw', 'trim': 0.0}",0.6381558672884369,0.0,static+deps+names,naive
+baseline_protocol_settings_salt1,LOF,"{'mode': 'scale_all', 'k': 100, 'trim': 0.0}",0.6610455071993533,0.0,static+deps+names,naive
+baseline_protocol_settings_salt1,OCSVM,"{'mode': 'scale_all', 'nu': 0.01, 'g': 1.0, 'trim': 0.0}",0.7212072040222612,0.0,static+deps+names,naive
+baseline_protocol_settings_salt1,IF,"{'mode': 'raw', 'trim': 0.0}",0.7573170600993842,0.0,static+deps+names+GuardDog,naive
+baseline_protocol_settings_salt1,LOF,"{'mode': 'binary_raw', 'k': 100, 'trim': 0.0}",0.6776307283672259,0.0,static+deps+names+GuardDog,naive
+baseline_protocol_settings_salt1,OCSVM,"{'mode': 'scale_all', 'nu': 0.01, 'g': 1.0, 'trim': 0.0}",0.8474457590660537,0.0,static+deps+names+GuardDog,naive
+baseline_protocol_settings_salt1,IF,"{'mode': 'raw', 'trim': 0.0}",0.639991941137604,0.01,static+deps+names,naive
+baseline_protocol_settings_salt1,LOF,"{'mode': 'scale_all', 'k': 100, 'trim': 0.0}",0.6318744600250329,0.01,static+deps+names,naive
+baseline_protocol_settings_salt1,OCSVM,"{'mode': 'scale_all', 'nu': 0.05, 'g': 0.1, 'trim': 0.0}",0.6077269399691658,0.01,static+deps+names,naive
+baseline_protocol_settings_salt1,IF,"{'mode': 'raw', 'trim': 0.0}",0.7495992520542438,0.01,static+deps+names+GuardDog,naive
+baseline_protocol_settings_salt1,LOF,"{'mode': 'binary_raw', 'k': 100, 'trim': 0.0}",0.5715453849660069,0.01,static+deps+names+GuardDog,naive
+baseline_protocol_settings_salt1,OCSVM,"{'mode': 'scale_all', 'nu': 0.1, 'g': 0.1, 'trim': 0.0}",0.7630822835405486,0.01,static+deps+names+GuardDog,naive
+baseline_protocol_settings_salt2,IF,"{'mode': 'raw', 'trim': 0.0}",0.6412382759124702,0.0,static+deps+names,naive
+baseline_protocol_settings_salt2,LOF,"{'mode': 'binary_raw', 'k': 10, 'trim': 0.0}",0.6686734160269799,0.0,static+deps+names,naive
+baseline_protocol_settings_salt2,OCSVM,"{'mode': 'scale_all', 'nu': 0.01, 'g': 1.0, 'trim': 0.0}",0.7172063236518659,0.0,static+deps+names,naive
+baseline_protocol_settings_salt2,IF,"{'mode': 'raw', 'trim': 0.0}",0.7387337476728209,0.0,static+deps+names+GuardDog,naive
+baseline_protocol_settings_salt2,LOF,"{'mode': 'binary_raw', 'k': 100, 'trim': 0.0}",0.6857146704241506,0.0,static+deps+names+GuardDog,naive
+baseline_protocol_settings_salt2,OCSVM,"{'mode': 'scale_all', 'nu': 0.05, 'g': 1.0, 'trim': 0.0}",0.8406154689382166,0.0,static+deps+names+GuardDog,naive
+baseline_protocol_settings_salt2,IF,"{'mode': 'raw', 'trim': 0.0}",0.6431586918531167,0.01,static+deps+names,naive
+baseline_protocol_settings_salt2,LOF,"{'mode': 'scale_all', 'k': 100, 'trim': 0.0}",0.6145837312621598,0.01,static+deps+names,naive
+baseline_protocol_settings_salt2,OCSVM,"{'mode': 'scale_all', 'nu': 0.05, 'g': 0.1, 'trim': 0.0}",0.6143205270469444,0.01,static+deps+names,naive
+baseline_protocol_settings_salt2,IF,"{'mode': 'raw', 'trim': 0.0}",0.7372371392601926,0.01,static+deps+names+GuardDog,naive
+baseline_protocol_settings_salt2,LOF,"{'mode': 'scale_all', 'k': 10, 'trim': 0.0}",0.5898118278734604,0.01,static+deps+names+GuardDog,naive
+baseline_protocol_settings_salt2,OCSVM,"{'mode': 'scale_all', 'nu': 0.1, 'g': 0.1, 'trim': 0.0}",0.7738902758898054,0.01,static+deps+names+GuardDog,naive
+baseline_protocol_settings_salt3,IF,"{'mode': 'raw', 'trim': 0.0}",0.6272896710440818,0.0,static+deps+names,naive
+baseline_protocol_settings_salt3,LOF,"{'mode': 'scale_all', 'k': 100, 'trim': 0.0}",0.6614013911363825,0.0,static+deps+names,naive
+baseline_protocol_settings_salt3,OCSVM,"{'mode': 'scale_all', 'nu': 0.01, 'g': 1.0, 'trim': 0.0}",0.7289779388920362,0.0,static+deps+names,naive
+baseline_protocol_settings_salt3,IF,"{'mode': 'raw', 'trim': 0.0}",0.7213186962292649,0.0,static+deps+names+GuardDog,naive
+baseline_protocol_settings_salt3,LOF,"{'mode': 'binary_raw', 'k': 100, 'trim': 0.0}",0.7024530803033224,0.0,static+deps+names+GuardDog,naive
+baseline_protocol_settings_salt3,OCSVM,"{'mode': 'scale_all', 'nu': 0.01, 'g': 1.0, 'trim': 0.0}",0.8542808435490887,0.0,static+deps+names+GuardDog,naive
+baseline_protocol_settings_salt3,IF,"{'mode': 'raw', 'trim': 0.0}",0.6344492794983146,0.01,static+deps+names,naive
+baseline_protocol_settings_salt3,LOF,"{'mode': 'scale_all', 'k': 100, 'trim': 0.0}",0.6299307892036581,0.01,static+deps+names,naive
+baseline_protocol_settings_salt3,OCSVM,"{'mode': 'scale_all', 'nu': 0.01, 'g': 1.0, 'trim': 0.0}",0.6185753425185933,0.01,static+deps+names,naive
+baseline_protocol_settings_salt3,IF,"{'mode': 'raw', 'trim': 0.0}",0.7285003140014943,0.01,static+deps+names+GuardDog,naive
+baseline_protocol_settings_salt3,LOF,"{'mode': 'scale_all', 'k': 10, 'trim': 0.0}",0.6020567821117793,0.01,static+deps+names+GuardDog,naive
+baseline_protocol_settings_salt3,OCSVM,"{'mode': 'scale_all', 'nu': 0.1, 'g': 0.1, 'trim': 0.0}",0.7694158630571157,0.01,static+deps+names+GuardDog,naive
+baseline_protocol_settings_salt4,IF,"{'mode': 'raw', 'trim': 0.0}",0.6412291266184806,0.0,static+deps+names,naive
+baseline_protocol_settings_salt4,LOF,"{'mode': 'binary_raw', 'k': 10, 'trim': 0.0}",0.6613415542494676,0.0,static+deps+names,naive
+baseline_protocol_settings_salt4,OCSVM,"{'mode': 'scale_all', 'nu': 0.01, 'g': 1.0, 'trim': 0.0}",0.7222330837873406,0.0,static+deps+names,naive
+baseline_protocol_settings_salt4,IF,"{'mode': 'raw', 'trim': 0.0}",0.7340872855009641,0.0,static+deps+names+GuardDog,naive
+baseline_protocol_settings_salt4,LOF,"{'mode': 'binary_raw', 'k': 100, 'trim': 0.0}",0.6956469178866904,0.0,static+deps+names+GuardDog,naive
+baseline_protocol_settings_salt4,OCSVM,"{'mode': 'scale_all', 'nu': 0.01, 'g': 1.0, 'trim': 0.0}",0.8445816806265392,0.0,static+deps+names+GuardDog,naive
+baseline_protocol_settings_salt4,IF,"{'mode': 'raw', 'trim': 0.0}",0.6361869058125573,0.01,static+deps+names,naive
+baseline_protocol_settings_salt4,LOF,"{'mode': 'scale_all', 'k': 100, 'trim': 0.0}",0.6242747757516356,0.01,static+deps+names,naive
+baseline_protocol_settings_salt4,OCSVM,"{'mode': 'scale_all', 'nu': 0.01, 'g': 1.0, 'trim': 0.0}",0.6100597484265151,0.01,static+deps+names,naive
+baseline_protocol_settings_salt4,IF,"{'mode': 'raw', 'trim': 0.0}",0.7402085445048642,0.01,static+deps+names+GuardDog,naive
+baseline_protocol_settings_salt4,LOF,"{'mode': 'scale_all', 'k': 10, 'trim': 0.0}",0.5901019600277222,0.01,static+deps+names+GuardDog,naive
+baseline_protocol_settings_salt4,OCSVM,"{'mode': 'scale_all', 'nu': 0.1, 'g': 0.1, 'trim': 0.0}",0.7649748766475981,0.01,static+deps+names+GuardDog,naive
+baseline_protocol_settings_salt5,IF,"{'mode': 'raw', 'trim': 0.0}",0.6363526769691064,0.0,static+deps+names,naive
+baseline_protocol_settings_salt5,LOF,"{'mode': 'binary_raw', 'k': 10, 'trim': 0.0}",0.6417994960505082,0.0,static+deps+names,naive
+baseline_protocol_settings_salt5,OCSVM,"{'mode': 'scale_all', 'nu': 0.01, 'g': 1.0, 'trim': 0.0}",0.7173645213347446,0.0,static+deps+names,naive
+baseline_protocol_settings_salt5,IF,"{'mode': 'raw', 'trim': 0.0}",0.746013596346625,0.0,static+deps+names+GuardDog,naive
+baseline_protocol_settings_salt5,LOF,"{'mode': 'binary_raw', 'k': 100, 'trim': 0.0}",0.6700382026227658,0.0,static+deps+names+GuardDog,naive
+baseline_protocol_settings_salt5,OCSVM,"{'mode': 'scale_all', 'nu': 0.01, 'g': 1.0, 'trim': 0.0}",0.8442755277024573,0.0,static+deps+names+GuardDog,naive
+baseline_protocol_settings_salt5,IF,"{'mode': 'raw', 'trim': 0.0}",0.6286871893506346,0.01,static+deps+names,naive
+baseline_protocol_settings_salt5,LOF,"{'mode': 'scale_all', 'k': 100, 'trim': 0.0}",0.6003547190696205,0.01,static+deps+names,naive
+baseline_protocol_settings_salt5,OCSVM,"{'mode': 'scale_all', 'nu': 0.01, 'g': 1.0, 'trim': 0.0}",0.6018232779366383,0.01,static+deps+names,naive
+baseline_protocol_settings_salt5,IF,"{'mode': 'raw', 'trim': 0.0}",0.7495315619907497,0.01,static+deps+names+GuardDog,naive
+baseline_protocol_settings_salt5,LOF,"{'mode': 'scale_all', 'k': 10, 'trim': 0.0}",0.5842797227151413,0.01,static+deps+names+GuardDog,naive
+baseline_protocol_settings_salt5,OCSVM,"{'mode': 'scale_all', 'nu': 0.1, 'g': 0.1, 'trim': 0.0}",0.7629823922105494,0.01,static+deps+names+GuardDog,naive
+baseline_protocol_settings_split,IF,"{'mode': 'raw', 'trim': 0.0}",0.6442131071321725,0.0,static+deps+names,naive
+baseline_protocol_settings_split,IF,"peers: {'mode': 'raw', 'trim': 0.0}",0.6040323313050586,0.0,static+deps+names,split
+baseline_protocol_settings_split,IF,"no peers: {'mode': 'raw', 'trim': 0.0}",0.6999495140001039,0.0,static+deps+names,split
+baseline_protocol_settings_split,OCSVM,"{'mode': 'scale_all', 'nu': 0.01, 'g': 1.0, 'trim': 0.0}",0.7314829101017853,0.0,static+deps+names,naive
+baseline_protocol_settings_split,OCSVM,"peers: {'mode': 'scale_all', 'nu': 0.01, 'g': 1.0, 'trim': 0.0}",0.6906071068750494,0.0,static+deps+names,split
+baseline_protocol_settings_split,OCSVM,"no peers: {'mode': 'scale_all', 'nu': 0.01, 'g': 1.0, 'trim': 0.0}",0.7250238877660347,0.0,static+deps+names,split
+baseline_protocol_settings_split,IF,"{'mode': 'raw', 'trim': 0.0}",0.7394290480330752,0.0,static+deps+names+GuardDog,naive
+baseline_protocol_settings_split,IF,"peers: {'mode': 'raw', 'trim': 0.0}",0.7192387623009633,0.0,static+deps+names+GuardDog,split
+baseline_protocol_settings_split,IF,"no peers: {'mode': 'raw', 'trim': 0.0}",0.7929474193007717,0.0,static+deps+names+GuardDog,split
+baseline_protocol_settings_split,OCSVM,"{'mode': 'scale_all', 'nu': 0.05, 'g': 1.0, 'trim': 0.0}",0.8550495325092216,0.0,static+deps+names+GuardDog,naive
+baseline_protocol_settings_split,OCSVM,"peers: {'mode': 'scale_all', 'nu': 0.01, 'g': 1.0, 'trim': 0.0}",0.8320180616831334,0.0,static+deps+names+GuardDog,split
+baseline_protocol_settings_split,OCSVM,"no peers: {'mode': 'scale_all', 'nu': 0.1, 'g': 0.1, 'trim': 0.0}",0.8830752843473143,0.0,static+deps+names+GuardDog,split
+baseline_protocol_settings_split,IF,"{'mode': 'raw', 'trim': 0.0}",0.6431738136914098,0.01,static+deps+names,naive
+baseline_protocol_settings_split,IF,"peers: {'mode': 'raw', 'trim': 0.0}",0.6106923379650653,0.01,static+deps+names,split
+baseline_protocol_settings_split,IF,"no peers: {'mode': 'raw', 'trim': 0.0}",0.6540017086698642,0.01,static+deps+names,split
+baseline_protocol_settings_split,OCSVM,"{'mode': 'scale_all', 'nu': 0.05, 'g': 0.1, 'trim': 0.0}",0.6133777395076204,0.01,static+deps+names,naive
+baseline_protocol_settings_split,OCSVM,"peers: {'mode': 'scale_all', 'nu': 0.05, 'g': 1.0, 'trim': 0.0}",0.6514596514596515,0.01,static+deps+names,split
+baseline_protocol_settings_split,OCSVM,"no peers: {'mode': 'scale_all', 'nu': 0.1, 'g': 0.1, 'trim': 0.0}",0.6008063726663523,0.01,static+deps+names,split
+baseline_protocol_settings_split,IF,"{'mode': 'raw', 'trim': 0.0}",0.7542300536387384,0.01,static+deps+names+GuardDog,naive
+baseline_protocol_settings_split,IF,"peers: {'mode': 'raw', 'trim': 0.0}",0.7217243150257504,0.01,static+deps+names+GuardDog,split
+baseline_protocol_settings_split,IF,"no peers: {'mode': 'raw', 'trim': 0.0}",0.7880493379837945,0.01,static+deps+names+GuardDog,split
+baseline_protocol_settings_split,OCSVM,"{'mode': 'scale_all', 'nu': 0.1, 'g': 0.1, 'trim': 0.0}",0.7855827606016462,0.01,static+deps+names+GuardDog,naive
+baseline_protocol_settings_split,OCSVM,"peers: {'mode': 'scale_all', 'nu': 0.05, 'g': 1.0, 'trim': 0.0}",0.8096958862509103,0.01,static+deps+names+GuardDog,split
+baseline_protocol_settings_split,OCSVM,"no peers: {'mode': 'scale_all', 'nu': 0.1, 'g': 0.1, 'trim': 0.0}",0.7263955316098832,0.01,static+deps+names+GuardDog,split
+baseline_protocol_settings_split,IF,"{'mode': 'raw', 'trim': 0.0}",0.6428476227376954,0.02,static+deps+names,naive
+baseline_protocol_settings_split,IF,"peers: {'mode': 'raw', 'trim': 0.0}",0.6147977487690406,0.02,static+deps+names,split
+baseline_protocol_settings_split,IF,"no peers: {'mode': 'raw', 'trim': 0.0}",0.6544792942326564,0.02,static+deps+names,split
+baseline_protocol_settings_split,OCSVM,"{'mode': 'scale_all', 'nu': 0.05, 'g': 0.1, 'trim': 0.0}",0.6075437062178055,0.02,static+deps+names,naive
+baseline_protocol_settings_split,OCSVM,"peers: {'mode': 'scale_all', 'nu': 0.1, 'g': 1.0, 'trim': 0.0}",0.6296260889562325,0.02,static+deps+names,split
+baseline_protocol_settings_split,OCSVM,"no peers: {'mode': 'scale_all', 'nu': 0.1, 'g': 0.1, 'trim': 0.0}",0.5906457964039165,0.02,static+deps+names,split
+baseline_protocol_settings_split,IF,"{'mode': 'raw', 'trim': 0.0}",0.755453694759225,0.02,static+deps+names+GuardDog,naive
+baseline_protocol_settings_split,IF,"peers: {'mode': 'raw', 'trim': 0.0}",0.7250436963355623,0.02,static+deps+names+GuardDog,split
+baseline_protocol_settings_split,IF,"no peers: {'mode': 'raw', 'trim': 0.0}",0.7785361051856172,0.02,static+deps+names+GuardDog,split
+baseline_protocol_settings_split,OCSVM,"{'mode': 'scale_all', 'nu': 0.1, 'g': 0.1, 'trim': 0.0}",0.7551141452779944,0.02,static+deps+names+GuardDog,naive
+baseline_protocol_settings_split,OCSVM,"peers: {'mode': 'scale_all', 'nu': 0.1, 'g': 1.0, 'trim': 0.0}",0.7925997447528548,0.02,static+deps+names+GuardDog,split
+baseline_protocol_settings_split,OCSVM,"no peers: {'mode': 'scale_all', 'nu': 0.1, 'g': 0.1, 'trim': 0.0}",0.6744315062516743,0.02,static+deps+names+GuardDog,split
+baseline_protocol_settings_split,IF,"{'mode': 'raw', 'trim': 0.0}",0.606214168406463,0.05,static+deps+names,naive
+baseline_protocol_settings_split,IF,"peers: {'mode': 'raw', 'trim': 0.0}",0.6055565912025243,0.05,static+deps+names,split
+baseline_protocol_settings_split,IF,"no peers: {'mode': 'raw', 'trim': 0.0}",0.5874543478563482,0.05,static+deps+names,split
+baseline_protocol_settings_split,OCSVM,"{'mode': 'scale_all', 'nu': 0.01, 'g': 1.0, 'trim': 0.0}",0.5814605740365724,0.05,static+deps+names,naive
+baseline_protocol_settings_split,OCSVM,"peers: {'mode': 'scale_all', 'nu': 0.01, 'g': 10.0, 'trim': 0.0}",0.6015680226206542,0.05,static+deps+names,split
+baseline_protocol_settings_split,OCSVM,"no peers: {'mode': 'scale_all', 'nu': 0.01, 'g': 10.0, 'trim': 0.0}",0.5534801331762054,0.05,static+deps+names,split
+baseline_protocol_settings_split,IF,"{'mode': 'raw', 'trim': 0.0}",0.7401963132771437,0.05,static+deps+names+GuardDog,naive
+baseline_protocol_settings_split,IF,"peers: {'mode': 'raw', 'trim': 0.0}",0.715271437759476,0.05,static+deps+names+GuardDog,split
+baseline_protocol_settings_split,IF,"no peers: {'mode': 'raw', 'trim': 0.0}",0.6916404305829951,0.05,static+deps+names+GuardDog,split
+baseline_protocol_settings_split,OCSVM,"{'mode': 'scale_all', 'nu': 0.01, 'g': 0.1, 'trim': 0.0}",0.6499052971479969,0.05,static+deps+names+GuardDog,naive
+baseline_protocol_settings_split,OCSVM,"peers: {'mode': 'scale_all', 'nu': 0.01, 'g': 0.1, 'trim': 0.0}",0.7158715819002901,0.05,static+deps+names+GuardDog,split
+baseline_protocol_settings_split,OCSVM,"no peers: {'mode': 'scale_all', 'nu': 0.01, 'g': 10.0, 'trim': 0.0}",0.5834344807496237,0.05,static+deps+names+GuardDog,split
