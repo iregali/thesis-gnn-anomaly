@@ -1,0 +1,14 @@
+level,depth,scorer,setting,val_pauc,selected_setting,chosen
+0.0,1,IF,{},0.7080112486088156,True,False
+0.0,1,LOF,{'k': 10},0.5517417364300586,False,False
+0.0,1,LOF,{'k': 35},0.6302391158209231,False,False
+0.0,1,LOF,{'k': 100},0.7640935045920849,True,False
+0.0,1,OCSVM,"{'nu': 0.01, 'g': 0.1}",0.7444059496209852,False,False
+0.0,1,OCSVM,"{'nu': 0.01, 'g': 1.0}",0.8379066555888042,False,False
+0.0,1,OCSVM,"{'nu': 0.01, 'g': 10.0}",0.8520472641705287,False,False
+0.0,1,OCSVM,"{'nu': 0.05, 'g': 0.1}",0.7927851928737599,False,False
+0.0,1,OCSVM,"{'nu': 0.05, 'g': 1.0}",0.8445009105354517,False,False
+0.0,1,OCSVM,"{'nu': 0.05, 'g': 10.0}",0.8521152712197022,True,True
+0.0,1,OCSVM,"{'nu': 0.1, 'g': 0.1}",0.777173446089021,False,False
+0.0,1,OCSVM,"{'nu': 0.1, 'g': 1.0}",0.8412613461716069,False,False
+0.0,1,OCSVM,"{'nu': 0.1, 'g': 10.0}",0.8521087133971033,False,False

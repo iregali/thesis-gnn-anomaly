@@ -6,3 +6,8 @@ __pycache__/
 venv/
 logs/
 pypi_malregistry/
+
+# per-package files: never commit
+results/*_scores*.csv
+results/label_noise_candidates.csv
+results/contrastive_valseeds*.csv

@@ -1,0 +1,133 @@
+level,features,method,variant,setting,val_pauc
+0.0,static,IF,naive,"{'mode': 'raw', 'trim': 0.0}",0.6374777375584899
+0.0,static,IF,robust,"{'mode': 'raw', 'trim': 0.0}",0.6374777375584899
+0.0,static,LOF,naive,"{'mode': 'binary_raw', 'k': 10, 'trim': 0.0}",0.7076165648412907
+0.0,static,LOF,robust,"{'mode': 'binary_raw', 'k': 10, 'trim': 0.0}",0.7076165648412907
+0.0,static,OCSVM,naive,"{'mode': 'scale_all', 'nu': 0.01, 'g': 1.0, 'trim': 0.0}",0.7310950270391777
+0.0,static,OCSVM,robust,"{'mode': 'scale_all', 'nu': 0.01, 'g': 1.0, 'trim': 0.0}",0.7310950270391777
+0.0,static+GuardDog,IF,naive,"{'mode': 'raw', 'trim': 0.0}",0.7696844126811044
+0.0,static+GuardDog,IF,robust,"{'mode': 'raw', 'trim': 0.0}",0.7696844126811044
+0.0,static+GuardDog,LOF,naive,"{'mode': 'binary_raw', 'k': 100, 'trim': 0.0}",0.7037603222708331
+0.0,static+GuardDog,LOF,robust,"{'mode': 'robust', 'k': 35, 'trim': 0.0}",0.8113868209989494
+0.0,static+GuardDog,OCSVM,naive,"{'mode': 'scale_all', 'nu': 0.05, 'g': 1.0, 'trim': 0.0}",0.8551610154934024
+0.0,static+GuardDog,OCSVM,robust,"{'mode': 'scale_all', 'nu': 0.05, 'g': 1.0, 'trim': 0.0}",0.8551610154934024
+0.0,static+deps+names,IF,naive,"{'mode': 'raw', 'trim': 0.0}",0.6442131071321725
+0.0,static+deps+names,IF,robust,"{'mode': 'raw', 'trim': 0.0}",0.6442131071321725
+0.0,static+deps+names,LOF,naive,"{'mode': 'scale_all', 'k': 100, 'trim': 0.0}",0.6658439635334058
+0.0,static+deps+names,LOF,robust,"{'mode': 'robust', 'k': 35, 'trim': 0.0}",0.666834194745836
+0.0,static+deps+names,OCSVM,naive,"{'mode': 'scale_all', 'nu': 0.01, 'g': 1.0, 'trim': 0.0}",0.7314829101017853
+0.0,static+deps+names,OCSVM,robust,"{'mode': 'scale_all', 'nu': 0.01, 'g': 1.0, 'trim': 0.0}",0.7314829101017853
+0.0,static+deps+names+GuardDog,IF,naive,"{'mode': 'raw', 'trim': 0.0}",0.7394290480330752
+0.0,static+deps+names+GuardDog,IF,robust,"{'mode': 'raw', 'trim': 0.0}",0.7394290480330752
+0.0,static+deps+names+GuardDog,LOF,naive,"{'mode': 'binary_raw', 'k': 100, 'trim': 0.0}",0.6875049373421303
+0.0,static+deps+names+GuardDog,LOF,robust,"{'mode': 'robust', 'k': 35, 'trim': 0.0}",0.7880407296646323
+0.0,static+deps+names+GuardDog,OCSVM,naive,"{'mode': 'scale_all', 'nu': 0.05, 'g': 1.0, 'trim': 0.0}",0.8550495325092216
+0.0,static+deps+names+GuardDog,OCSVM,robust,"{'mode': 'scale_all', 'nu': 0.05, 'g': 1.0, 'trim': 0.0}",0.8550495325092216
+0.01,static,IF,naive,"{'mode': 'raw', 'trim': 0.0}",0.6315504374583798
+0.01,static,IF,robust,"{'mode': 'raw', 'trim': 0.01}",0.6382049272200097
+0.01,static,IF,fixed,"{'mode': 'raw', 'trim': 0.0}",
+0.01,static,LOF,naive,"{'mode': 'scale_all', 'k': 100, 'trim': 0.0}",0.616966568645435
+0.01,static,LOF,robust,"{'mode': 'scale_all', 'k': 100, 'trim': 0.05}",0.6443347911737294
+0.01,static,LOF,fixed,"{'mode': 'binary_raw', 'k': 10, 'trim': 0.0}",
+0.01,static,OCSVM,naive,"{'mode': 'scale_all', 'nu': 0.05, 'g': 1.0, 'trim': 0.0}",0.6047673184352962
+0.01,static,OCSVM,robust,"{'mode': 'scale_all', 'nu': 0.01, 'g': 1.0, 'trim': 0.05}",0.6166998838597474
+0.01,static,OCSVM,fixed,"{'mode': 'scale_all', 'nu': 0.01, 'g': 1.0, 'trim': 0.0}",
+0.01,static+GuardDog,IF,naive,"{'mode': 'raw', 'trim': 0.0}",0.7680634160875897
+0.01,static+GuardDog,IF,robust,"{'mode': 'raw', 'trim': 0.0}",0.7680634160875897
+0.01,static+GuardDog,IF,fixed,"{'mode': 'raw', 'trim': 0.0}",
+0.01,static+GuardDog,LOF,naive,"{'mode': 'binary_raw', 'k': 35, 'trim': 0.0}",0.603844851389721
+0.01,static+GuardDog,LOF,robust,"{'mode': 'robust', 'k': 100, 'trim': 0.05}",0.7033464508001485
+0.01,static+GuardDog,LOF,fixed,"{'mode': 'binary_raw', 'k': 100, 'trim': 0.0}",
+0.01,static+GuardDog,OCSVM,naive,"{'mode': 'scale_all', 'nu': 0.1, 'g': 0.1, 'trim': 0.0}",0.7823871579374457
+0.01,static+GuardDog,OCSVM,robust,"{'mode': 'scale_all', 'nu': 0.05, 'g': 0.1, 'trim': 0.02}",0.7954685567282926
+0.01,static+GuardDog,OCSVM,fixed,"{'mode': 'scale_all', 'nu': 0.05, 'g': 1.0, 'trim': 0.0}",
+0.01,static+deps+names,IF,naive,"{'mode': 'raw', 'trim': 0.0}",0.6431738136914098
+0.01,static+deps+names,IF,robust,"{'mode': 'raw', 'trim': 0.0}",0.6431738136914098
+0.01,static+deps+names,IF,fixed,"{'mode': 'raw', 'trim': 0.0}",
+0.01,static+deps+names,LOF,naive,"{'mode': 'scale_all', 'k': 100, 'trim': 0.0}",0.6232278319334508
+0.01,static+deps+names,LOF,robust,"{'mode': 'scale_all', 'k': 100, 'trim': 0.02}",0.6345842804984747
+0.01,static+deps+names,LOF,fixed,"{'mode': 'scale_all', 'k': 100, 'trim': 0.0}",
+0.01,static+deps+names,OCSVM,naive,"{'mode': 'scale_all', 'nu': 0.05, 'g': 0.1, 'trim': 0.0}",0.6133777395076204
+0.01,static+deps+names,OCSVM,robust,"{'mode': 'scale_all', 'nu': 0.05, 'g': 0.1, 'trim': 0.01}",0.6163843797280458
+0.01,static+deps+names,OCSVM,fixed,"{'mode': 'scale_all', 'nu': 0.01, 'g': 1.0, 'trim': 0.0}",
+0.01,static+deps+names+GuardDog,IF,naive,"{'mode': 'raw', 'trim': 0.0}",0.7542300536387384
+0.01,static+deps+names+GuardDog,IF,robust,"{'mode': 'raw', 'trim': 0.0}",0.7542300536387384
+0.01,static+deps+names+GuardDog,IF,fixed,"{'mode': 'raw', 'trim': 0.0}",
+0.01,static+deps+names+GuardDog,LOF,naive,"{'mode': 'scale_all', 'k': 10, 'trim': 0.0}",0.5982617155348927
+0.01,static+deps+names+GuardDog,LOF,robust,"{'mode': 'robust', 'k': 100, 'trim': 0.05}",0.7191199572089931
+0.01,static+deps+names+GuardDog,LOF,fixed,"{'mode': 'binary_raw', 'k': 100, 'trim': 0.0}",
+0.01,static+deps+names+GuardDog,OCSVM,naive,"{'mode': 'scale_all', 'nu': 0.1, 'g': 0.1, 'trim': 0.0}",0.7855827606016462
+0.01,static+deps+names+GuardDog,OCSVM,robust,"{'mode': 'scale_all', 'nu': 0.1, 'g': 0.1, 'trim': 0.02}",0.7923574771109221
+0.01,static+deps+names+GuardDog,OCSVM,fixed,"{'mode': 'scale_all', 'nu': 0.05, 'g': 1.0, 'trim': 0.0}",
+0.02,static,IF,naive,"{'mode': 'raw', 'trim': 0.0}",0.6360362309983295
+0.02,static,IF,robust,"{'mode': 'raw', 'trim': 0.0}",0.6360362309983295
+0.02,static,IF,fixed,"{'mode': 'raw', 'trim': 0.0}",
+0.02,static,LOF,naive,"{'mode': 'binary_raw', 'k': 35, 'trim': 0.0}",0.5952553181967858
+0.02,static,LOF,robust,"{'mode': 'binary_raw', 'k': 35, 'trim': 0.01}",0.5992077421653602
+0.02,static,LOF,fixed,"{'mode': 'binary_raw', 'k': 10, 'trim': 0.0}",
+0.02,static,OCSVM,naive,"{'mode': 'scale_all', 'nu': 0.05, 'g': 1.0, 'trim': 0.0}",0.5944555067220414
+0.02,static,OCSVM,robust,"{'mode': 'scale_all', 'nu': 0.01, 'g': 1.0, 'trim': 0.05}",0.6031574944284315
+0.02,static,OCSVM,fixed,"{'mode': 'scale_all', 'nu': 0.01, 'g': 1.0, 'trim': 0.0}",
+0.02,static+GuardDog,IF,naive,"{'mode': 'raw', 'trim': 0.0}",0.7546383388160981
+0.02,static+GuardDog,IF,robust,"{'mode': 'raw', 'trim': 0.01}",0.7654925067465117
+0.02,static+GuardDog,IF,fixed,"{'mode': 'raw', 'trim': 0.0}",
+0.02,static+GuardDog,LOF,naive,"{'mode': 'binary_raw', 'k': 35, 'trim': 0.0}",0.6690045911437456
+0.02,static+GuardDog,LOF,robust,"{'mode': 'binary_raw', 'k': 35, 'trim': 0.05}",0.7118288728906353
+0.02,static+GuardDog,LOF,fixed,"{'mode': 'binary_raw', 'k': 100, 'trim': 0.0}",
+0.02,static+GuardDog,OCSVM,naive,"{'mode': 'scale_all', 'nu': 0.1, 'g': 0.1, 'trim': 0.0}",0.7507947261262014
+0.02,static+GuardDog,OCSVM,robust,"{'mode': 'scale_all', 'nu': 0.05, 'g': 0.1, 'trim': 0.05}",0.7665580314776699
+0.02,static+GuardDog,OCSVM,fixed,"{'mode': 'scale_all', 'nu': 0.05, 'g': 1.0, 'trim': 0.0}",
+0.02,static+deps+names,IF,naive,"{'mode': 'raw', 'trim': 0.0}",0.6428476227376954
+0.02,static+deps+names,IF,robust,"{'mode': 'raw', 'trim': 0.0}",0.6428476227376954
+0.02,static+deps+names,IF,fixed,"{'mode': 'raw', 'trim': 0.0}",
+0.02,static+deps+names,LOF,naive,"{'mode': 'binary_raw', 'k': 10, 'trim': 0.0}",0.5912528604706051
+0.02,static+deps+names,LOF,robust,"{'mode': 'binary_raw', 'k': 10, 'trim': 0.05}",0.6038608816227405
+0.02,static+deps+names,LOF,fixed,"{'mode': 'scale_all', 'k': 100, 'trim': 0.0}",
+0.02,static+deps+names,OCSVM,naive,"{'mode': 'scale_all', 'nu': 0.05, 'g': 0.1, 'trim': 0.0}",0.6075437062178055
+0.02,static+deps+names,OCSVM,robust,"{'mode': 'scale_all', 'nu': 0.05, 'g': 0.1, 'trim': 0.01}",0.6127071414263058
+0.02,static+deps+names,OCSVM,fixed,"{'mode': 'scale_all', 'nu': 0.01, 'g': 1.0, 'trim': 0.0}",
+0.02,static+deps+names+GuardDog,IF,naive,"{'mode': 'raw', 'trim': 0.0}",0.755453694759225
+0.02,static+deps+names+GuardDog,IF,robust,"{'mode': 'raw', 'trim': 0.0}",0.755453694759225
+0.02,static+deps+names+GuardDog,IF,fixed,"{'mode': 'raw', 'trim': 0.0}",
+0.02,static+deps+names+GuardDog,LOF,naive,"{'mode': 'binary_raw', 'k': 10, 'trim': 0.0}",0.5937749504656692
+0.02,static+deps+names+GuardDog,LOF,robust,"{'mode': 'binary_raw', 'k': 10, 'trim': 0.05}",0.6065226289509287
+0.02,static+deps+names+GuardDog,LOF,fixed,"{'mode': 'binary_raw', 'k': 100, 'trim': 0.0}",
+0.02,static+deps+names+GuardDog,OCSVM,naive,"{'mode': 'scale_all', 'nu': 0.1, 'g': 0.1, 'trim': 0.0}",0.7551141452779944
+0.02,static+deps+names+GuardDog,OCSVM,robust,"{'mode': 'scale_all', 'nu': 0.1, 'g': 0.1, 'trim': 0.05}",0.769820183897133
+0.02,static+deps+names+GuardDog,OCSVM,fixed,"{'mode': 'scale_all', 'nu': 0.05, 'g': 1.0, 'trim': 0.0}",
+0.05,static,IF,naive,"{'mode': 'raw', 'trim': 0.0}",0.5777979086739409
+0.05,static,IF,robust,"{'mode': 'raw', 'trim': 0.0}",0.5777979086739409
+0.05,static,IF,fixed,"{'mode': 'raw', 'trim': 0.0}",
+0.05,static,LOF,naive,"{'mode': 'binary_raw', 'k': 35, 'trim': 0.0}",0.5701573166992948
+0.05,static,LOF,robust,"{'mode': 'robust', 'k': 35, 'trim': 0.05}",0.5844298103799523
+0.05,static,LOF,fixed,"{'mode': 'binary_raw', 'k': 10, 'trim': 0.0}",
+0.05,static,OCSVM,naive,"{'mode': 'binary_raw', 'nu': 0.01, 'g': 1.0, 'trim': 0.0}",0.57861132155852
+0.05,static,OCSVM,robust,"{'mode': 'binary_raw', 'nu': 0.01, 'g': 1.0, 'trim': 0.0}",0.57861132155852
+0.05,static,OCSVM,fixed,"{'mode': 'scale_all', 'nu': 0.01, 'g': 1.0, 'trim': 0.0}",
+0.05,static+GuardDog,IF,naive,"{'mode': 'raw', 'trim': 0.0}",0.7166357568556114
+0.05,static+GuardDog,IF,robust,"{'mode': 'raw', 'trim': 0.05}",0.7180580757126122
+0.05,static+GuardDog,IF,fixed,"{'mode': 'raw', 'trim': 0.0}",
+0.05,static+GuardDog,LOF,naive,"{'mode': 'binary_raw', 'k': 100, 'trim': 0.0}",0.654602155422703
+0.05,static+GuardDog,LOF,robust,"{'mode': 'binary_raw', 'k': 100, 'trim': 0.02}",0.6884028732735393
+0.05,static+GuardDog,LOF,fixed,"{'mode': 'binary_raw', 'k': 100, 'trim': 0.0}",
+0.05,static+GuardDog,OCSVM,naive,"{'mode': 'scale_all', 'nu': 0.05, 'g': 0.1, 'trim': 0.0}",0.6499254563804304
+0.05,static+GuardDog,OCSVM,robust,"{'mode': 'scale_all', 'nu': 0.05, 'g': 0.1, 'trim': 0.0}",0.6499254563804304
+0.05,static+GuardDog,OCSVM,fixed,"{'mode': 'scale_all', 'nu': 0.05, 'g': 1.0, 'trim': 0.0}",
+0.05,static+deps+names,IF,naive,"{'mode': 'raw', 'trim': 0.0}",0.606214168406463
+0.05,static+deps+names,IF,robust,"{'mode': 'raw', 'trim': 0.0}",0.606214168406463
+0.05,static+deps+names,IF,fixed,"{'mode': 'raw', 'trim': 0.0}",
+0.05,static+deps+names,LOF,naive,"{'mode': 'scale_all', 'k': 35, 'trim': 0.0}",0.5777481177986531
+0.05,static+deps+names,LOF,robust,"{'mode': 'scale_all', 'k': 35, 'trim': 0.05}",0.5883613464691377
+0.05,static+deps+names,LOF,fixed,"{'mode': 'scale_all', 'k': 100, 'trim': 0.0}",
+0.05,static+deps+names,OCSVM,naive,"{'mode': 'scale_all', 'nu': 0.01, 'g': 1.0, 'trim': 0.0}",0.5814605740365724
+0.05,static+deps+names,OCSVM,robust,"{'mode': 'scale_all', 'nu': 0.01, 'g': 1.0, 'trim': 0.0}",0.5814605740365724
+0.05,static+deps+names,OCSVM,fixed,"{'mode': 'scale_all', 'nu': 0.01, 'g': 1.0, 'trim': 0.0}",
+0.05,static+deps+names+GuardDog,IF,naive,"{'mode': 'raw', 'trim': 0.0}",0.7401963132771437
+0.05,static+deps+names+GuardDog,IF,robust,"{'mode': 'raw', 'trim': 0.0}",0.7401963132771437
+0.05,static+deps+names+GuardDog,IF,fixed,"{'mode': 'raw', 'trim': 0.0}",
+0.05,static+deps+names+GuardDog,LOF,naive,"{'mode': 'binary_raw', 'k': 35, 'trim': 0.0}",0.6108932962719203
+0.05,static+deps+names+GuardDog,LOF,robust,"{'mode': 'scale_all', 'k': 35, 'trim': 0.02}",0.6296037356757875
+0.05,static+deps+names+GuardDog,LOF,fixed,"{'mode': 'binary_raw', 'k': 100, 'trim': 0.0}",
+0.05,static+deps+names+GuardDog,OCSVM,naive,"{'mode': 'scale_all', 'nu': 0.01, 'g': 0.1, 'trim': 0.0}",0.6499052971479969
+0.05,static+deps+names+GuardDog,OCSVM,robust,"{'mode': 'scale_all', 'nu': 0.01, 'g': 0.1, 'trim': 0.0}",0.6499052971479969
+0.05,static+deps+names+GuardDog,OCSVM,fixed,"{'mode': 'scale_all', 'nu': 0.05, 'g': 1.0, 'trim': 0.0}",

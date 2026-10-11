@@ -1,0 +1,10 @@
+level,features,method,variant,setting,val_pauc
+0.01,static+deps+names+GuardDog,OCSVM,naive,"{'mode': 'scale_all', 'nu': 0.1, 'g': 0.1, 'trim': 0.0}",0.7855827606016462
+0.01,static+deps+names+GuardDog,PEER,naive,"{'mode': 'scale_all', 'k': 50}",0.719244073311059
+0.01,static+deps+names+GuardDog,IF,naive,"{'mode': 'raw', 'trim': 0.0}",0.7542300536387384
+0.02,static+deps+names+GuardDog,OCSVM,naive,"{'mode': 'scale_all', 'nu': 0.1, 'g': 0.1, 'trim': 0.0}",0.7551141452779944
+0.02,static+deps+names+GuardDog,PEER,naive,"{'mode': 'scale_all', 'k': 50}",0.702052333631281
+0.02,static+deps+names+GuardDog,IF,naive,"{'mode': 'raw', 'trim': 0.0}",0.755453694759225
+0.05,static+deps+names+GuardDog,OCSVM,naive,"{'mode': 'scale_all', 'nu': 0.01, 'g': 0.1, 'trim': 0.0}",0.6499052971479969
+0.05,static+deps+names+GuardDog,PEER,naive,"{'mode': 'scale_all', 'k': 50}",0.6519323313581686
+0.05,static+deps+names+GuardDog,IF,naive,"{'mode': 'raw', 'trim': 0.0}",0.7401963132771437

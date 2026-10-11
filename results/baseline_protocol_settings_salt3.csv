@@ -1,0 +1,13 @@
+level,features,method,variant,setting,val_pauc
+0.0,static+deps+names,IF,naive,"{'mode': 'raw', 'trim': 0.0}",0.6272896710440818
+0.0,static+deps+names,LOF,naive,"{'mode': 'scale_all', 'k': 100, 'trim': 0.0}",0.6614013911363825
+0.0,static+deps+names,OCSVM,naive,"{'mode': 'scale_all', 'nu': 0.01, 'g': 1.0, 'trim': 0.0}",0.7289779388920362
+0.0,static+deps+names+GuardDog,IF,naive,"{'mode': 'raw', 'trim': 0.0}",0.7213186962292649
+0.0,static+deps+names+GuardDog,LOF,naive,"{'mode': 'binary_raw', 'k': 100, 'trim': 0.0}",0.7024530803033224
+0.0,static+deps+names+GuardDog,OCSVM,naive,"{'mode': 'scale_all', 'nu': 0.01, 'g': 1.0, 'trim': 0.0}",0.8542808435490887
+0.01,static+deps+names,IF,naive,"{'mode': 'raw', 'trim': 0.0}",0.6344492794983146
+0.01,static+deps+names,LOF,naive,"{'mode': 'scale_all', 'k': 100, 'trim': 0.0}",0.6299307892036581
+0.01,static+deps+names,OCSVM,naive,"{'mode': 'scale_all', 'nu': 0.01, 'g': 1.0, 'trim': 0.0}",0.6185753425185933
+0.01,static+deps+names+GuardDog,IF,naive,"{'mode': 'raw', 'trim': 0.0}",0.7285003140014943
+0.01,static+deps+names+GuardDog,LOF,naive,"{'mode': 'scale_all', 'k': 10, 'trim': 0.0}",0.6020567821117793
+0.01,static+deps+names+GuardDog,OCSVM,naive,"{'mode': 'scale_all', 'nu': 0.1, 'g': 0.1, 'trim': 0.0}",0.7694158630571157

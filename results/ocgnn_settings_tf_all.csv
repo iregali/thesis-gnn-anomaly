@@ -1,0 +1,5 @@
+level,encoder,depth,val_pauc,chosen
+0.0,tf,1,0.6528587461406758,False
+0.0,tf,2,0.83964229263664,True
+0.01,tf,1,0.5625016660209033,False
+0.01,tf,2,0.6837169447031647,True

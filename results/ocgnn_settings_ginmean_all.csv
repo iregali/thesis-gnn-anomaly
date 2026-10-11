@@ -1,0 +1,5 @@
+level,encoder,depth,val_pauc,chosen
+0.0,gin,1,0.7413526759954122,False
+0.0,gin,2,0.7962263495619405,True
+0.01,gin,1,0.608941979725277,False
+0.01,gin,2,0.6664526266235089,True

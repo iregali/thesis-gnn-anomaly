@@ -1,0 +1,25 @@
+level,features,method,setting,val_pauc
+0.0,static+deps+names,IF,{'mode': 'raw'},0.6442131071321725
+0.0,static+deps+names,LOF,"{'mode': 'scale_all', 'k': 100}",0.6658439635334058
+0.0,static+deps+names,OCSVM,"{'mode': 'scale_all', 'nu': 0.01, 'g': 1.0}",0.7314829101017853
+0.0,static+deps+names+GuardDog,IF,{'mode': 'raw'},0.7394290480330752
+0.0,static+deps+names+GuardDog,LOF,"{'mode': 'binary_raw', 'k': 100}",0.6875049373421303
+0.0,static+deps+names+GuardDog,OCSVM,"{'mode': 'scale_all', 'nu': 0.05, 'g': 1.0}",0.8550495325092216
+0.01,static+deps+names,IF,{'mode': 'raw'},0.6431738136914098
+0.01,static+deps+names,LOF,"{'mode': 'scale_all', 'k': 100}",0.6232278319334508
+0.01,static+deps+names,OCSVM,"{'mode': 'scale_all', 'nu': 0.05, 'g': 0.1}",0.6133777395076204
+0.01,static+deps+names+GuardDog,IF,{'mode': 'raw'},0.7542300536387384
+0.01,static+deps+names+GuardDog,LOF,"{'mode': 'scale_all', 'k': 10}",0.5982617155348927
+0.01,static+deps+names+GuardDog,OCSVM,"{'mode': 'scale_all', 'nu': 0.1, 'g': 0.1}",0.7855827606016462
+0.02,static+deps+names,IF,{'mode': 'raw'},0.6428476227376954
+0.02,static+deps+names,LOF,"{'mode': 'binary_raw', 'k': 10}",0.5912528604706051
+0.02,static+deps+names,OCSVM,"{'mode': 'scale_all', 'nu': 0.05, 'g': 0.1}",0.6075437062178055
+0.02,static+deps+names+GuardDog,IF,{'mode': 'raw'},0.755453694759225
+0.02,static+deps+names+GuardDog,LOF,"{'mode': 'binary_raw', 'k': 10}",0.5937749504656692
+0.02,static+deps+names+GuardDog,OCSVM,"{'mode': 'scale_all', 'nu': 0.1, 'g': 0.1}",0.7551141452779944
+0.05,static+deps+names,IF,{'mode': 'raw'},0.606214168406463
+0.05,static+deps+names,LOF,"{'mode': 'scale_all', 'k': 35}",0.5777481177986531
+0.05,static+deps+names,OCSVM,"{'mode': 'scale_all', 'nu': 0.01, 'g': 1.0}",0.5814605740365724
+0.05,static+deps+names+GuardDog,IF,{'mode': 'raw'},0.7401963132771437
+0.05,static+deps+names+GuardDog,LOF,"{'mode': 'binary_raw', 'k': 35}",0.6108932962719203
+0.05,static+deps+names+GuardDog,OCSVM,"{'mode': 'scale_all', 'nu': 0.01, 'g': 0.1}",0.6499052971479969

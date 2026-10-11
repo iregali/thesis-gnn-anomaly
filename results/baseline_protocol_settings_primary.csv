@@ -1,0 +1,2 @@
+level,features,method,variant,setting,val_pauc
+0.0,static+deps+names+GuardDog,OCSVM,naive,"{'mode': 'scale_all', 'nu': 0.05, 'g': 1.0, 'trim': 0.0}",0.8550495325092216
