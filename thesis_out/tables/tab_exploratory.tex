@@ -1,0 +1,34 @@
+\begin{table}[htbp]
+\centering
+\scriptsize
+\caption{Exploratory comparisons under contamination (specified after seeing the descriptive results; not pre-registered).}
+\label{tab:exploratory}
+\begin{tabular}{lp{6.2cm}lccc}
+\toprule
+ID & Comparison (a vs b) & Metric & a vs b & Difference [95\% CI] & Holm $p$ \\
+\midrule
+\multicolumn{6}{l}{\textit{Proposed loss vs its base (9 tests, Holm)}} \\
+X1 & Triplet + GIN, 1\% contamination: N3 vs tuned & caught & 62.5 vs 30.0 & +32.5 [+18.0, +38.5] & 0.004$^{*}$ \\
+X2 & Triplet + GIN, 1\% contamination: N3 vs tuned & AUC & 0.958 vs 0.935 & +0.022 [+0.015, +0.030] & 0.004$^{*}$ \\
+X3 & Triplet + GIN, 2\% contamination: N3 vs tuned & caught & 57.7 vs 32.2 & +25.6 [+14.1, +40.6] & 0.004$^{*}$ \\
+X4 & Triplet + GIN, 2\% contamination: N3 vs tuned & AUC & 0.952 vs 0.922 & +0.030 [+0.022, +0.037] & 0.004$^{*}$ \\
+X5 & Triplet + GIN, 5\% contamination: N3 vs tuned & caught & 27.2 vs 18.7 & +8.5 [-5.6, +18.6] & 0.321 \\
+X6 & Triplet + GIN, 5\% contamination: N3 vs tuned & AUC & 0.931 vs 0.923 & +0.007 [-0.001, +0.015] & 0.238 \\
+X7 & Triplet + GAT, 1\% contamination: N3 vs tuned & caught & 62.6 vs 55.0 & +7.7 [-1.4, +20.6] & 0.321 \\
+X8 & Triplet + TransformerConv, 1\% contamination: N3 vs tuned & caught & 63.3 vs 52.4 & +10.9 [+1.9, +24.8] & 0.019$^{*}$ \\
+X9 & Triplet + GraphGPS, 1\% contamination: N3 vs tuned & caught & 64.5 vs 16.7 & +47.9 [+42.6, +52.3] & 0.004$^{*}$ \\
+\multicolumn{6}{l}{\textit{Proposed loss vs raw-feature detectors (9 tests, Holm)}} \\
+R1 & 1\% contamination: Triplet + GIN N3 vs raw OCSVM with per-group thresholds & caught & 62.5 vs 62.6 & -0.1 [-3.3, +12.3] & 1.000 \\
+R2 & 1\% contamination: Triplet + GIN N3 vs raw OCSVM & caught & 62.5 vs 34.9 & +27.6 [-2.6, +46.2] & 0.299 \\
+R3 & 1\% contamination: Triplet + GIN N3 vs raw Isolation Forest & caught & 62.5 vs 53.8 & +8.7 [+2.6, +17.5] & 0.018$^{*}$ \\
+R4 & 2\% contamination: Triplet + GIN N3 vs raw OCSVM with per-group thresholds & caught & 57.7 vs 37.7 & +20.0 [+9.8, +26.8] & 0.006$^{*}$ \\
+R5 & 2\% contamination: Triplet + GIN N3 vs raw OCSVM & caught & 57.7 vs 17.9 & +39.8 [+21.1, +49.7] & 0.004$^{*}$ \\
+R6 & 2\% contamination: Triplet + GIN N3 vs raw Isolation Forest & caught & 57.7 vs 49.2 & +8.5 [-4.4, +28.3] & 0.619 \\
+R7 & 5\% contamination: Triplet + GIN N3 vs raw OCSVM with per-group thresholds & caught & 27.2 vs 8.2 & +19.0 [+8.0, +25.9] & 0.008$^{*}$ \\
+R8 & 5\% contamination: Triplet + GIN N3 vs raw OCSVM & caught & 27.2 vs 9.1 & +18.1 [+7.3, +25.1] & 0.010$^{*}$ \\
+R9 & 5\% contamination: Triplet + GIN N3 vs raw Isolation Forest & caught & 27.2 vs 30.0 & -2.8 [-17.4, +12.0] & 1.000 \\
+\bottomrule
+\end{tabular}
+\par\smallskip
+\parbox{0.95\linewidth}{\footnotesize Same procedure as Table~\ref{tab:primary}. Raw detectors use the same contamination draws as the contrastive runs.}
+\end{table}

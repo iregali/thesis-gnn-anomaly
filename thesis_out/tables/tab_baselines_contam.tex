@@ -1,0 +1,18 @@
+\begin{table}[htbp]
+\centering
+\small
+\caption{Feature-based detectors under contamination: ROC-AUC / caught at 1\% FPR (\%, mean over 3 contamination draws).}
+\label{tab:baselines-contam}
+\begin{tabular}{lcccc}
+\toprule
+Detector & 0\% & 1\% & 2\% & 5\% \\
+\midrule
+Isolation Forest & 0.944 / 41.2 & 0.946 / 53.8 & 0.944 / 49.2 & 0.938 / 30.0 \\
+LOF & 0.914 / 43.7 & 0.605 / 15.2 & 0.556 / 15.5 & 0.589 / 19.8 \\
+One-Class SVM & 0.963 / 73.9 & 0.951 / 34.9 & 0.944 / 17.9 & 0.928 / 9.1 \\
+One-Class SVM, per-group & 0.962 / 74.6 & 0.953 / 62.6 & 0.947 / 37.7 & 0.920 / 8.2 \\
+\bottomrule
+\end{tabular}
+\par\smallskip
+\parbox{0.95\linewidth}{\footnotesize All features including GuardDog. Contamination: share of unlabelled malware in the training set.}
+\end{table}

@@ -1,0 +1,20 @@
+\begin{table}[htbp]
+\centering
+\small
+\caption{Mechanism check: how strongly the encoder reacts to each feature, by how much the feature varies among normal training packages (Triplet + GIN depth 1, validation).}
+\label{tab:sensitivity}
+\begin{tabular}{lccccc}
+\toprule
+Feature group & Features & Gain (base) & Ratio (base) & Gain (N3) & Ratio (N3) \\
+\midrule
+Almost constant ($<$5\%) & 12 & 0.077 & 1.26 & 0.121 & 1.99 \\
+Rare (5--25\%) & 13 & 0.095 & 1.51 & 0.099 & 1.57 \\
+Common ($>$25\%) & 24 & 0.107 & 1.67 & 0.108 & 1.69 \\
+\midrule
+Rank corr. ratio vs variability &  &  & +0.80 &  & -0.01 \\
+Rank corr. gain vs separation &  & -0.06 &  & +0.23 &  \\
+\bottomrule
+\end{tabular}
+\par\smallskip
+\parbox{0.95\linewidth}{\footnotesize Gain: embedding movement per unit feature change (malware-like values), normalised by the embedding spread. Ratio: trained / untrained gain. Means over features and 3 seeds.}
+\end{table}

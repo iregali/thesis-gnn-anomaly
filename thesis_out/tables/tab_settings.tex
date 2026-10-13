@@ -1,0 +1,17 @@
+\begin{table}[htbp]
+\centering
+\small
+\caption{Settings chosen on validation (mean pAUC up to 5\% FPR over 3 seeds, GIN depth 1, clean training).}
+\label{tab:settings}
+\begin{tabular}{lcccccccc}
+\toprule
+Loss & Epochs & Size & LR & Val. pAUC & $\nu$ & $K$ & $\lambda$ / $\beta$ & Val. pAUC (N3) \\
+\midrule
+InfoNCE & 100 & 64 & 0.001 & 0.861 & 2\% & 1 & 2 & 0.873 \\
+Triplet & 25 & 128 & 0.001 & 0.866 & 2\% & 1 & 2 & 0.887 \\
+DGI & 100 & 128 & 0.001 & 0.865 & 10\% & 4 & -- & 0.874 \\
+\bottomrule
+\end{tabular}
+\par\smallskip
+\parbox{0.95\linewidth}{\footnotesize Left: training settings of the base losses (grid of 18 per loss). Right: settings of the proposed loss (grid of 18 for InfoNCE / Triplet, 6 for DGI), used for N1--N4.}
+\end{table}

@@ -1,0 +1,27 @@
+\begin{table}[htbp]
+\centering
+\footnotesize
+\caption{Feature-based detectors, clean training (test set, family-weighted).}
+\label{tab:baselines}
+\begin{tabular}{lcccc}
+\toprule
+Detector & ROC-AUC [95\% CI] & Caught (\%) [95\% CI] & Conn. AUC & Iso. AUC \\
+\midrule
+\multicolumn{5}{l}{\textit{Features: static + dependencies + names, without GuardDog}} \\
+Isolation Forest & 0.895 [0.884, 0.905] & 20.1 [8.0, 28.5] & 0.815 & 0.940 \\
+LOF & 0.890 [0.878, 0.902] & 37.4 [32.7, 44.5] & 0.809 & 0.917 \\
+One-Class SVM & 0.929 [0.920, 0.937] & 57.3 [43.3, 60.9] & 0.867 & 0.946 \\
+One-Class SVM, per-group thresholds & 0.927 [0.918, 0.936] & 58.8 [54.9, 62.7] & 0.868 & 0.946 \\
+\multicolumn{5}{l}{\textit{Features: static + dependencies + names, with GuardDog}} \\
+Isolation Forest & 0.944 [0.936, 0.952] & 43.2 [27.4, 56.6] & 0.900 & 0.968 \\
+LOF & 0.914 [0.903, 0.923] & 43.7 [40.6, 46.8] & 0.848 & 0.933 \\
+One-Class SVM & 0.963 [0.957, 0.969] & 73.9 [70.6, 76.8] & 0.935 & 0.971 \\
+One-Class SVM, per-group thresholds & 0.962 [0.956, 0.968] & 74.6 [71.1, 77.4] & 0.935 & 0.971 \\
+\midrule
+GuardDog rule (any rule fires) & 0.902 [0.890, 0.913] & -- & 0.808 & 0.936 \\
+Random Forest, supervised (reference) & 0.986 [0.981, 0.990] & 90.6 [87.7, 92.3] & 0.966 & 0.993 \\
+\bottomrule
+\end{tabular}
+\par\smallskip
+\parbox{0.95\linewidth}{\footnotesize Settings chosen on validation (pAUC up to 5\% FPR). Caught: family-weighted share of malware flagged at a 1\% false-positive rate. Connected / isolated: packages with / without dependency relations to the training graph. Scores of the 3 seeds are rank-averaged (ensemble); the One-Class SVM is deterministic, so its seeds coincide. The supervised reference uses labelled malware and is not comparable to the unsupervised detectors.}
+\end{table}

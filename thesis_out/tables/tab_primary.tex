@@ -1,0 +1,33 @@
+\begin{table}[htbp]
+\centering
+\scriptsize
+\caption{Pre-registered comparisons (clean training, GIN). Difference a $-$ b with paired two-level bootstrap 95\% CI; Holm correction per family.}
+\label{tab:primary}
+\begin{tabular}{lp{6.2cm}lccc}
+\toprule
+ID & Comparison (a vs b) & Metric & a vs b & Difference [95\% CI] & Holm $p$ \\
+\midrule
+\multicolumn{6}{l}{\textit{Primary (pre-registered) (8 tests, Holm)}} \\
+P1 & full loss vs InfoNCE & caught & 72.0 vs 65.6 & +6.4 [-1.9, +18.2] & 1.000 \\
+P2 & full loss vs Triplet & caught & 74.9 vs 74.3 & +0.6 [-3.1, +5.4] & 1.000 \\
+P3 & full loss vs DGI & caught & 73.1 vs 71.6 & +1.5 [-1.9, +4.1] & 1.000 \\
+P4 & full loss vs InfoNCE & AUC & 0.952 vs 0.962 & -0.011 [-0.016, -0.006] & 0.003$^{*}$ \\
+P5 & full loss vs Triplet & AUC & 0.963 vs 0.961 & +0.001 [-0.004, +0.007] & 1.000 \\
+P6 & full loss vs DGI & AUC & 0.958 vs 0.956 & +0.002 [-0.004, +0.008] & 1.000 \\
+P7 & best full loss vs raw OCSVM + GuardDog & caught & 74.9 vs 73.9 & +1.0 [-2.9, +5.0] & 1.000 \\
+P8 & best full loss vs raw OCSVM + GuardDog & AUC & 0.963 vs 0.963 & -0.001 [-0.006, +0.004] & 1.000 \\
+\multicolumn{6}{l}{\textit{Ablation (pre-registered) (9 tests, Holm)}} \\
+A1 & InfoNCE: full vs same-group negatives only & caught & 72.0 vs 72.8 & -0.8 [-4.4, +3.6] & 1.000 \\
+A2 & InfoNCE: full vs shifted negatives only & caught & 72.0 vs 71.9 & +0.0 [-1.9, +1.9] & 1.000 \\
+A3 & InfoNCE: rarity-chosen vs uniformly chosen shifts & caught & 72.0 vs 71.7 & +0.3 [-1.6, +2.4] & 1.000 \\
+A4 & Triplet: full vs same-group negatives only & caught & 74.9 vs 74.1 & +0.8 [-3.3, +4.7] & 1.000 \\
+A5 & Triplet: full vs shifted negatives only & caught & 74.9 vs 72.8 & +2.1 [-1.1, +5.8] & 1.000 \\
+A6 & Triplet: rarity-chosen vs uniformly chosen shifts & caught & 74.9 vs 74.1 & +0.8 [-3.4, +5.6] & 1.000 \\
+A7 & DGI: full vs per-group summaries only & caught & 73.1 vs 70.7 & +2.4 [-0.9, +5.2] & 1.000 \\
+A8 & DGI: full vs shifted corruption only & caught & 73.1 vs 73.4 & -0.3 [-3.5, +2.8] & 1.000 \\
+A9 & DGI: rarity-chosen vs uniformly chosen shifts & caught & 73.1 vs 72.1 & +1.0 [-2.5, +4.0] & 1.000 \\
+\bottomrule
+\end{tabular}
+\par\smallskip
+\parbox{0.95\linewidth}{\footnotesize Caught in percentage points. $^{*}$ significant at $\alpha = 0.05$ after Holm. Primary family: answers RQ2/RQ3; ablation family: N3 against N1, N2 and N4.}
+\end{table}

@@ -1,0 +1,29 @@
+\begin{table}[htbp]
+\centering
+\footnotesize
+\caption{Proposed loss and ablation conditions, clean training.}
+\label{tab:newloss-clean}
+\begin{tabular}{llccccc}
+\toprule
+Loss & Encoder & Base (tuned) & N1 same-group & N2 shifts & N3 full & N4 uniform shifts \\
+\midrule
+InfoNCE & GIN & 0.964 / 65.6 & 0.967 / 72.8 & 0.953 / 71.9 & 0.953 / 72.0 & 0.947 / 71.7 \\
+InfoNCE & GAT & 0.962 / 71.5 & 0.959 / 68.2 & 0.945 / 69.5 & 0.951 / 70.2 & 0.945 / 68.5 \\
+InfoNCE & TransformerConv & 0.962 / 71.4 & 0.962 / 72.4 & 0.941 / 64.0 & 0.950 / 71.0 & 0.937 / 74.0 \\
+InfoNCE & GraphGPS & 0.963 / 67.2 & 0.963 / 73.3 & 0.963 / 66.7 & 0.944 / 72.3 & 0.963 / 68.1 \\
+\addlinespace
+Triplet & GIN & 0.962 / 74.3 & 0.962 / 74.1 & 0.964 / 72.8 & 0.964 / 74.9 & 0.956 / 74.1 \\
+Triplet & GAT & 0.953 / 67.3 & 0.952 / 68.8 & 0.961 / 71.3 & 0.963 / 71.3 & 0.956 / 70.9 \\
+Triplet & TransformerConv & 0.958 / 73.3 & 0.957 / 74.0 & 0.961 / 73.5 & 0.961 / 72.2 & 0.957 / 72.0 \\
+Triplet & GraphGPS & 0.963 / 73.8 & 0.963 / 74.2 & 0.964 / 74.6 & 0.964 / 73.5 & 0.962 / 67.6 \\
+\addlinespace
+DGI & GIN & 0.958 / 71.6 & 0.962 / 70.7 & 0.960 / 73.4 & 0.959 / 73.1 & 0.962 / 72.1 \\
+DGI & GAT & 0.959 / 68.2 & 0.956 / 67.8 & 0.963 / 72.9 & 0.963 / 72.8 & 0.961 / 70.4 \\
+DGI & TransformerConv & 0.958 / 72.4 & 0.961 / 72.7 & 0.959 / 70.6 & 0.956 / 72.9 & 0.959 / 72.4 \\
+DGI & GraphGPS & 0.954 / 69.7 & 0.955 / 70.0 & 0.959 / 63.4 & 0.960 / 67.0 & 0.959 / 64.0 \\
+\addlinespace
+\bottomrule
+\end{tabular}
+\par\smallskip
+\parbox{0.95\linewidth}{\footnotesize Each cell: ROC-AUC / caught at 1\% FPR (\%, mean over 3 seeds); validation-chosen depth and scorer. N1: negatives from the anchor's connectivity group only; N2: rarity-shifted negatives only; N3: both (full loss); N4: both, shifted feature chosen among all varying features. Raw detectors at this level: One-Class SVM 0.963 / 73.9, with per-group thresholds 0.962 / 74.6, Isolation Forest 0.944 / 41.2.}
+\end{table}
