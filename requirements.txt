@@ -7,3 +7,4 @@ numpy>=1.24
 guarddog==2.10.0
 rapidfuzz>=3.0
 datasketch>=1.6
+matplotlib
