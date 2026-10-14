@@ -28,11 +28,15 @@ configuration). If candidates are caught much less (or more) often, label noise
 changes what "caught" means.
 
 Outputs: RESULTS_DIR/label_noise_candidates.csv (one row per malicious package:
-flags, matched snippets, split, family) and a printed summary.
+flags, matched snippets, split, family; PRIVATE, never commit) and
+RESULTS_DIR/label_noise_summary.csv (counts, shares and caught rates only, no
+package names or text: safe to commit to results/).
 
 Usage
-  python src/label_noise_check.py
+  python src/label_noise_check.py                     # scan the archives (Slurm job, minutes)
+  python src/label_noise_check.py --from-candidates   # reuse label_noise_candidates.csv (login node, seconds)
 """
+import argparse
 import os
 import re
 import sys
@@ -90,6 +94,16 @@ def scan(item):
     return out
 
 
+def caught_fw(scores, y, w, keep):
+    """Family-weighted share caught at 1% FPR among test malware in `keep`, mean over seeds."""
+    out = []
+    for s in scores:
+        thr = np.quantile(s[y == 0], 0.99)
+        m = (y == 1) & keep
+        out.append(float(np.sum(w[m] * (s[m] > thr)) / np.sum(w[m])))
+    return float(np.mean(out))
+
+
 def caught_by_group(scores, y, cand):
     """Mean over seeds of the share caught at 1% FPR, for candidates and for the rest (test malware)."""
     res = {"candidates": [], "rest": []}
@@ -110,33 +124,52 @@ def seed_scores(df, paths):
 
 
 def main():
+    ap = argparse.ArgumentParser(description="Label-noise candidates among malicious packages")
+    ap.add_argument("--from-candidates", action="store_true",
+                    help="reuse RESULTS_DIR/label_noise_candidates.csv instead of scanning the archives")
+    args = ap.parse_args()
     feats, _ = load_features()
     splits = pd.read_csv(f"{DATA_DIR}/{SPLIT_FILE}", dtype=str, keep_default_na=False)
     role = dict(zip(splits["path"], splits["split"]))
     fam = dict(zip(splits["path"], splits["campaign_id"]))
-    mal = feats[feats["label"] == 1][["path", "Name"]].copy()
-    print(f"scanning {len(mal)} malicious archives (text only)", flush=True)
-    with ProcessPoolExecutor(max_workers=int(os.environ.get("SLURM_CPUS_PER_TASK", 4))) as ex:
-        rows = list(ex.map(scan, zip(mal["path"], mal["Name"]), chunksize=64))
-    res = mal.merge(pd.DataFrame(rows), on="path")
+    wmap = dict(zip(splits["path"], splits["family_weight"].astype(float)))
+    cats = ["research", "callback", "ctf", "test_name"]
+    out = f"{RESULTS_DIR}/label_noise_candidates.csv"
+    if args.from_candidates:
+        res = pd.read_csv(out, dtype={"path": str, "Name": str}, keep_default_na=False)
+        for c in cats + ["read_failed"]:
+            res[c] = pd.to_numeric(res[c], errors="coerce").fillna(0).astype(int)
+        print(f"reusing {out} ({len(res)} malicious packages)", flush=True)
+    else:
+        mal = feats[feats["label"] == 1][["path", "Name"]].copy()
+        print(f"scanning {len(mal)} malicious archives (text only)", flush=True)
+        with ProcessPoolExecutor(max_workers=int(os.environ.get("SLURM_CPUS_PER_TASK", 4))) as ex:
+            rows = list(ex.map(scan, zip(mal["path"], mal["Name"]), chunksize=64))
+        res = mal.merge(pd.DataFrame(rows), on="path")
     res["split"] = res["path"].map(role).fillna("")
     res["family"] = res["path"].map(fam).fillna("")
-    cats = ["research", "callback", "ctf", "test_name"]
     res[cats] = res[cats].fillna(0).astype(int)
     res["any"] = (res[cats].sum(axis=1) > 0).astype(int)
     res["self_declared"] = ((res["research"] + res["ctf"]) > 0).astype(int)
     os.makedirs(RESULTS_DIR, exist_ok=True)
-    out = f"{RESULTS_DIR}/label_noise_candidates.csv"
-    res.to_csv(out, index=False)
+    if not args.from_candidates:
+        res.to_csv(out, index=False)
 
+    summary = []   # no package names, paths or text: safe to publish
     ok = res[res["read_failed"] == 0]
     print(f"\nread {len(ok)} of {len(res)} archives\n")
     print("=== Candidates (packages; families) ===")
     for c in cats + ["self_declared", "any"]:
         n, f = int(ok[c].sum()), ok.loc[ok[c] == 1, "family"].nunique()
+        summary.append({"section": "candidates", "category": c, "group": "all", "packages": n,
+                        "of": len(ok), "share": n / len(ok), "families": f})
         print(f"{c:14s} {n:6d} packages ({n / len(ok):5.1%}) in {f:5d} families")
     print("\n=== By split (share of malicious packages flagged: self-declared / any) ===")
     for sp, g in ok.groupby("split"):
+        for c in ["self_declared", "any"]:
+            summary.append({"section": "by_split", "category": c, "group": sp or "(none)",
+                            "packages": int(g[c].sum()), "of": len(g), "share": g[c].mean(),
+                            "families": g.loc[g[c] == 1, "family"].nunique()})
         print(f"{sp or '(none)':8s} {len(g):6d} packages | self-declared {g['self_declared'].mean():5.1%} | "
               f"any {g['any'].mean():5.1%}")
     print("\n=== 10 random self-declared candidates (check by hand) ===")
@@ -148,6 +181,7 @@ def main():
     # detection: test malware, clean training
     test_paths = feats.loc[feats["path"].map(role) == "test", "path"].values
     y = feats.set_index("path").loc[test_paths, "label"].values
+    w = np.array([wmap.get(p, 1.0) for p in test_paths])
     flag = res.set_index("path")["self_declared"].reindex(test_paths).fillna(0).astype(bool).values
     anyf = res.set_index("path")["any"].reindex(test_paths).fillna(0).astype(bool).values
     print(f"\n=== Caught at 1% FPR on test, clean training (self-declared: {int(flag[y == 1].sum())} of "
@@ -169,9 +203,24 @@ def main():
     for name, d in sources:
         S = seed_scores(d, test_paths)
         a, b = caught_by_group(S, y, flag), caught_by_group(S, y, anyf)
+        all_fw, excl_fw = caught_fw(S, y, w, np.ones(len(y), bool)), caught_fw(S, y, w, ~flag)
         print(f"{name:34s} self-declared {a['candidates']:5.1%} vs rest {a['rest']:5.1%} | "
-              f"any flag {b['candidates']:5.1%} vs rest {b['rest']:5.1%}")
-    print(f"\nSaved {out}")
+              f"any flag {b['candidates']:5.1%} vs rest {b['rest']:5.1%} | family-weighted caught: all test "
+              f"malware {all_fw:5.1%}, without self-declared probes {excl_fw:5.1%}")
+        label = "raw OCSVM" if name.startswith("raw") else "Triplet + GIN, N3"
+        for grp, v in [("self_declared", a["candidates"]), ("rest_of_self_declared", a["rest"]),
+                       ("any_flag", b["candidates"]), ("rest_of_any_flag", b["rest"]),
+                       ("all_test_malware_fw", all_fw), ("without_self_declared_fw", excl_fw)]:
+            summary.append({"section": "caught_test_clean", "category": label, "group": grp, "caught": v})
+    summary.append({"section": "test_counts", "category": "self_declared", "group": "test",
+                    "packages": int(flag[y == 1].sum()), "of": int((y == 1).sum())})
+    summary.append({"section": "test_counts", "category": "any", "group": "test",
+                    "packages": int(anyf[y == 1].sum()), "of": int((y == 1).sum())})
+    sout = f"{RESULTS_DIR}/label_noise_summary.csv"
+    pd.DataFrame(summary).to_csv(sout, index=False)
+    print(f"\nSaved {sout} (no package names: can go to results/ in the repo)")
+    if not args.from_candidates:
+        print(f"Saved {out} (PRIVATE: matched text from malicious packages, never commit)")
 
 
 if __name__ == "__main__":
