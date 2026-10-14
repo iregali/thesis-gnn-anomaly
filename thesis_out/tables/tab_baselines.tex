@@ -3,6 +3,7 @@
 \footnotesize
 \caption{Feature-based detectors, clean training (test set, family-weighted).}
 \label{tab:baselines}
+\begin{adjustbox}{max width=\linewidth}
 \begin{tabular}{lcccc}
 \toprule
 Detector & ROC-AUC [95\% CI] & Caught (\%) [95\% CI] & Conn. AUC & Iso. AUC \\
@@ -22,6 +23,7 @@ GuardDog rule (any rule fires) & 0.902 [0.890, 0.913] & -- & 0.808 & 0.936 \\
 Random Forest, supervised (reference) & 0.986 [0.981, 0.990] & 90.6 [87.7, 92.3] & 0.966 & 0.993 \\
 \bottomrule
 \end{tabular}
+\end{adjustbox}
 \par\smallskip
 \parbox{0.95\linewidth}{\footnotesize Settings chosen on validation (pAUC up to 5\% FPR). Caught: family-weighted share of malware flagged at a 1\% false-positive rate. Connected / isolated: packages with / without dependency relations to the training graph. Scores of the 3 seeds are rank-averaged (ensemble); the One-Class SVM is deterministic, so its seeds coincide. The supervised reference uses labelled malware and is not comparable to the unsupervised detectors.}
 \end{table}

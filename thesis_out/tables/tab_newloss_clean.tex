@@ -3,6 +3,7 @@
 \footnotesize
 \caption{Proposed loss and ablation conditions, clean training.}
 \label{tab:newloss-clean}
+\begin{adjustbox}{max width=\linewidth}
 \begin{tabular}{llccccc}
 \toprule
 Loss & Encoder & Base (tuned) & N1 same-group & N2 shifts & N3 full & N4 uniform shifts \\
@@ -24,6 +25,7 @@ DGI & GraphGPS & 0.954 / 69.7 & 0.955 / 70.0 & 0.959 / 63.4 & 0.960 / 67.0 & 0.9
 \addlinespace
 \bottomrule
 \end{tabular}
+\end{adjustbox}
 \par\smallskip
 \parbox{0.95\linewidth}{\footnotesize Each cell: ROC-AUC / caught at 1\% FPR (\%, mean over 3 seeds); validation-chosen depth and scorer. N1: negatives from the anchor's connectivity group only; N2: rarity-shifted negatives only; N3: both (full loss); N4: both, shifted feature chosen among all varying features. Raw detectors at this level: One-Class SVM 0.963 / 73.9, with per-group thresholds 0.962 / 74.6, Isolation Forest 0.944 / 41.2.}
 \end{table}

@@ -3,6 +3,7 @@
 \footnotesize
 \caption{Contrastive encoders with tuned training settings (validation-chosen depth and scorer).}
 \label{tab:contrastive-tuned}
+\begin{adjustbox}{max width=\linewidth}
 \begin{tabular}{lllcccc}
 \toprule
 Loss & Encoder & Chosen & ROC-AUC & Caught (\%) & Conn. AUC & Iso. AUC \\
@@ -37,6 +38,7 @@ DGI & GraphGPS & IF, depth 1 & 0.938 & 16.0 $\pm$ 4.8 & 0.878 & 0.960 \\
 \multicolumn{3}{l}{Raw One-Class SVM (reference)} & 0.951 & 34.9 $\pm$ 1.7 & 0.921 & 0.963 \\
 \bottomrule
 \end{tabular}
+\end{adjustbox}
 \par\smallskip
 \parbox{0.95\linewidth}{\footnotesize Caught: mean $\pm$ sd over 3 training seeds. ROC-AUC: rank-averaged seed ensemble.}
 \end{table}

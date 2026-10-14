@@ -3,6 +3,7 @@
 \scriptsize
 \caption{Exploratory comparisons under contamination (specified after seeing the descriptive results; not pre-registered).}
 \label{tab:exploratory}
+\begin{adjustbox}{max width=\linewidth}
 \begin{tabular}{lp{6.2cm}lccc}
 \toprule
 ID & Comparison (a vs b) & Metric & a vs b & Difference [95\% CI] & Holm $p$ \\
@@ -29,6 +30,7 @@ R8 & 5\% contamination: Triplet + GIN N3 vs raw OCSVM & caught & 27.2 vs 9.1 & +
 R9 & 5\% contamination: Triplet + GIN N3 vs raw Isolation Forest & caught & 27.2 vs 30.0 & -2.8 [-17.4, +12.0] & 1.000 \\
 \bottomrule
 \end{tabular}
+\end{adjustbox}
 \par\smallskip
 \parbox{0.95\linewidth}{\footnotesize Same procedure as Table~\ref{tab:primary}. Raw detectors use the same contamination draws as the contrastive runs.}
 \end{table}

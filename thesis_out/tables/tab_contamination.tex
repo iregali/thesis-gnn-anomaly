@@ -3,6 +3,7 @@
 \footnotesize
 \caption{Caught at 1\% FPR (\%) as contamination grows: Triplet + GIN with and without the proposed loss, and the raw-feature detectors.}
 \label{tab:contamination}
+\begin{adjustbox}{max width=\linewidth}
 \begin{tabular}{lcccccc}
 \toprule
 Contam. & Triplet tuned & Triplet N3 & OCSVM & OCSVM per-group & IF & AUC tuned / N3 \\
@@ -13,6 +14,7 @@ Contam. & Triplet tuned & Triplet N3 & OCSVM & OCSVM per-group & IF & AUC tuned 
 5\% & 18.7 $\pm$ 9.5 & 27.2 $\pm$ 4.9 & 9.1 & 8.2 & 30.0 & 0.925 / 0.933 \\
 \bottomrule
 \end{tabular}
+\end{adjustbox}
 \par\smallskip
 \parbox{0.95\linewidth}{\footnotesize OCSVM, OCSVM per-group, IF: raw-feature detectors. Mean $\pm$ sd over 3 seeds (each seed = a different contamination draw at levels above 0). Paired tests: Table~\ref{tab:exploratory}.}
 \end{table}

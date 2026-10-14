@@ -3,6 +3,7 @@
 \scriptsize
 \caption{Pre-registered comparisons (clean training, GIN). Difference a $-$ b with paired two-level bootstrap 95\% CI; Holm correction per family.}
 \label{tab:primary}
+\begin{adjustbox}{max width=\linewidth}
 \begin{tabular}{lp{6.2cm}lccc}
 \toprule
 ID & Comparison (a vs b) & Metric & a vs b & Difference [95\% CI] & Holm $p$ \\
@@ -28,6 +29,7 @@ A8 & DGI: full vs shifted corruption only & caught & 73.1 vs 73.4 & -0.3 [-3.5, 
 A9 & DGI: rarity-chosen vs uniformly chosen shifts & caught & 73.1 vs 72.1 & +1.0 [-2.5, +4.0] & 1.000 \\
 \bottomrule
 \end{tabular}
+\end{adjustbox}
 \par\smallskip
 \parbox{0.95\linewidth}{\footnotesize Caught in percentage points. $^{*}$ significant at $\alpha = 0.05$ after Holm. Primary family: answers RQ2/RQ3; ablation family: N3 against N1, N2 and N4.}
 \end{table}

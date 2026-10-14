@@ -3,6 +3,7 @@
 \footnotesize
 \caption{Label noise: malicious packages that are security-research probes, CTF material or test uploads (text-only scan of every malicious archive).}
 \label{tab:label-noise}
+\begin{adjustbox}{max width=\linewidth}
 \begin{tabular}{p{5.4cm}ccc}
 \toprule
 Candidate type & Malicious packages & Families & In test set \\
@@ -19,6 +20,7 @@ raw OCSVM & self-declared 39.6 vs rest 68.4 &  & all 73.9, without probes 75.7 \
 Triplet + GIN, N3 & self-declared 49.2 vs rest 70.0 &  & all 74.9, without probes 76.1 \\
 \bottomrule
 \end{tabular}
+\end{adjustbox}
 \par\smallskip
 \parbox{0.95\linewidth}{\footnotesize Matches are candidates (keyword and domain patterns); a random sample was checked by hand. Callback services are also used by real malware, so that row is an indicator, not proof. Caught rates: unweighted for self-declared vs the rest; family-weighted for all test malware with and without the self-declared probes.}
 \end{table}
