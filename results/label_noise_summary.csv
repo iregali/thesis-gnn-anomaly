@@ -1,0 +1,29 @@
+section,category,group,packages,of,share,families,caught
+candidates,research,all,254.0,11071.0,0.02294282359317135,95.0,
+candidates,callback,all,463.0,11071.0,0.04182097371511155,130.0,
+candidates,ctf,all,53.0,11071.0,0.004787282088338903,13.0,
+candidates,test_name,all,53.0,11071.0,0.004787282088338903,27.0,
+candidates,self_declared,all,300.0,11071.0,0.027097823141540963,106.0,
+candidates,any,all,683.0,11071.0,0.06169271068557493,204.0,
+by_split,self_declared,contam,22.0,493.0,0.04462474645030426,17.0,
+by_split,any,contam,48.0,493.0,0.0973630831643002,36.0,
+by_split,self_declared,excluded,69.0,7873.0,0.008764130572843898,13.0,
+by_split,any,excluded,245.0,7873.0,0.03111901435285152,27.0,
+by_split,self_declared,test,139.0,1990.0,0.06984924623115578,63.0,
+by_split,any,test,272.0,1990.0,0.13668341708542714,122.0,
+by_split,self_declared,val,70.0,715.0,0.0979020979020979,25.0,
+by_split,any,val,118.0,715.0,0.16503496503496504,40.0,
+caught_test_clean,raw OCSVM,self_declared,,,,,0.39568345323741005
+caught_test_clean,raw OCSVM,rest_of_self_declared,,,,,0.6839546191247973
+caught_test_clean,raw OCSVM,any_flag,,,,,0.5588235294117647
+caught_test_clean,raw OCSVM,rest_of_any_flag,,,,,0.680442374854482
+caught_test_clean,raw OCSVM,all_test_malware_fw,,,,,0.7390763797873889
+caught_test_clean,raw OCSVM,without_self_declared_fw,,,,,0.7570309201788529
+caught_test_clean,"Triplet + GIN, N3",self_declared,,,,,0.49160671462829736
+caught_test_clean,"Triplet + GIN, N3",rest_of_self_declared,,,,,0.6999819917161894
+caught_test_clean,"Triplet + GIN, N3",any_flag,,,,,0.6348039215686274
+caught_test_clean,"Triplet + GIN, N3",rest_of_any_flag,,,,,0.693441986806364
+caught_test_clean,"Triplet + GIN, N3",all_test_malware_fw,,,,,0.7488945924955098
+caught_test_clean,"Triplet + GIN, N3",without_self_declared_fw,,,,,0.7614331577882346
+test_counts,self_declared,test,139.0,1990.0,,,
+test_counts,any,test,272.0,1990.0,,,
