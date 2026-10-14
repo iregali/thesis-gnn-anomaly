@@ -1,0 +1,24 @@
+\begin{table}[htbp]
+\centering
+\footnotesize
+\caption{Label noise: malicious packages that are security-research probes, CTF material or test uploads (text-only scan of every malicious archive).}
+\label{tab:label-noise}
+\begin{tabular}{p{5.4cm}ccc}
+\toprule
+Candidate type & Malicious packages & Families & In test set \\
+\midrule
+Self-declared research / proof of concept & 254 (2.3\%) & 95 & -- \\
+Capture-the-flag material & 53 (0.5\%) & 13 & -- \\
+Self-declared (research or CTF) & 300 (2.7\%) & 106 & 139 (7.0\%) \\
+Calls an out-of-band testing service & 463 (4.2\%) & 130 & -- \\
+Test / demo package name & 53 (0.5\%) & 27 & -- \\
+Any of the above & 683 (6.2\%) & 204 & 272 (13.7\%) \\
+\midrule
+\multicolumn{4}{l}{\textit{Caught at 1\% FPR on test, clean training (\%)}} \\
+raw OCSVM & self-declared 39.6 vs rest 68.4 &  & all 73.9, without probes 75.7 \\
+Triplet + GIN, N3 & self-declared 49.2 vs rest 70.0 &  & all 74.9, without probes 76.1 \\
+\bottomrule
+\end{tabular}
+\par\smallskip
+\parbox{0.95\linewidth}{\footnotesize Matches are candidates (keyword and domain patterns); a random sample was checked by hand. Callback services are also used by real malware, so that row is an indicator, not proof. Caught rates: unweighted for self-declared vs the rest; family-weighted for all test malware with and without the self-declared probes.}
+\end{table}
