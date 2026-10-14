@@ -44,7 +44,7 @@ Usage
   python src/sensitivity_check.py --encoder gps --depths 1
   # mechanism check of the proposed loss (Methodology section 38): same settings as the run, e.g.
   python src/sensitivity_check.py --loss triplet --depths 1 --epochs 25 --dim 128 \
-      --strata conn --shift rare --rare-nu 0.05 --shift-k 4 --shift-weight 1 --tag _triplet_gin_n3
+      --strata conn --shift rare --rare-nu 0.02 --shift-k 1 --shift-weight 2 --tag _triplet_gin_n3
 """
 import argparse
 import os
