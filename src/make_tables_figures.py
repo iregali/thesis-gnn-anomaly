@@ -70,10 +70,10 @@ def caught_sd(r):
 
 def table(name, caption, label, header, rows, colspec, note=None, size=r"\small"):
     lines = [r"\begin{table}[htbp]", r"\centering", size, f"\\caption{{{caption}}}", f"\\label{{{label}}}",
-             f"\\begin{{tabular}}{{{colspec}}}", r"\toprule", " & ".join(header) + r" \\", r"\midrule"]
+             r"\begin{adjustbox}{max width=\linewidth}", f"\\begin{{tabular}}{{{colspec}}}", r"\toprule", " & ".join(header) + r" \\", r"\midrule"]
     for r in rows:
         lines.append(r if isinstance(r, str) else " & ".join(r) + r" \\")
-    lines += [r"\bottomrule", r"\end{tabular}"]
+    lines += [r"\bottomrule", r"\end{tabular}", r"\end{adjustbox}"]
     if note:
         lines += [r"\par\smallskip", f"\\parbox{{0.95\\linewidth}}{{\\footnotesize {note}}}"]
     lines.append(r"\end{table}")
@@ -405,6 +405,95 @@ def t_label_noise():
 # ---------------------------------------------------------------------------
 # Figures
 # ---------------------------------------------------------------------------
+PI_PROJECT = 1 / 65
+
+
+def precision(tpr, fpr, pi=PI_PROJECT):
+    """Precision at a base rate pi from a detection rate and a false-positive rate."""
+    return tpr * pi / (tpr * pi + fpr * (1 - pi))
+
+
+def t_operating():
+    """GuardDog at its own operating point next to the score-based detectors at fixed FPRs."""
+    gd = baseline("GuardDog rule", None)
+    # GuardDog's own FPR on the test normals, recovered exactly from the stored per-release precision
+    p, t = gd["prec@ownFPR_per_project_1:65"], gd["tpr_gd"]
+    gd_fpr = t * PI_PROJECT * (1 - p) / (p * (1 - PI_PROJECT))
+    rows = [r"\multicolumn{8}{l}{\textit{Clean training}} \\",
+            ["GuardDog rule (any rule fires)", f3(gd["auc_fw"]), "--", "--", "--",
+             f"{pct(gd['tpr_gd_fw'])} (FPR {pct(gd_fpr)})", "0.0",
+             f"{pct(precision(gd['tpr_gd_fw'], gd_fpr))} (own FPR)"]]
+
+    def row(lab, r):
+        return [lab, f3(r["auc_fw"]), pct(r["tpr05_fw"]), pct(r["tpr1_fw"]), pct(r["tpr2_fw"]),
+                pct(r["tpr_gd_fw"]), pct(r["tpr1_hard_fw"]), pct(r["prec_fw@1%FPR_per_project_1:65"])]
+
+    for lv in [0.0, 0.01]:
+        if lv:
+            rows.append(r"\midrule")
+            rows.append(r"\multicolumn{8}{l}{\textit{1\% contamination}} \\")
+        oc = baseline(f"OCSVM ({GD})", lv)
+        if oc is not None:
+            rows.append(row("One-Class SVM, raw features", oc))
+        for tag, lab in [("_triplet_gin_tuned", "Triplet + GIN, tuned base"),
+                         ("_triplet_gin_n3", "Triplet + GIN, N3")]:
+            r = chosen_row(tag, lv)
+            if r is not None:
+                rows.append(row(f"{lab} [{r['config']}]", r))
+    table("tab_operating", "Operating points (test set, family-weighted, \\%): detection at fixed false-positive "
+          "rates, at GuardDog's own false-positive rate, on GuardDog-hard malware, and precision at a base rate "
+          "of one malicious project in 65.", "tab:operating",
+          ["Detector", "ROC-AUC", "0.5\\%", "1\\%", "2\\%", "At GD FPR", "Hard, 1\\%", "Prec. 1:65"],
+          rows, "lccccccc", size=r"\footnotesize",
+          note="0.5\\%, 1\\%, 2\\%: share of malware caught at that false-positive rate. At GD FPR: caught at "
+               "GuardDog's own false-positive rate. Hard: malware on which no GuardDog rule fires, caught at 1\\% "
+               "FPR. Prec. 1:65: precision at 1\\% FPR (GuardDog: at its own FPR) for one malicious project in 65 "
+               "(PyPI 2025). Contrastive models: validation-chosen depth and scorer, ensemble of 3 seeds.")
+
+
+def t_svdd():
+    """Deep SVDD control: same encoders with a one-class objective (preliminary runs, all columns rescaled)."""
+    def get(run, method, lv):
+        d = read(run)
+        if d is None:
+            return None
+        m = d[(d["method"] == method) & np.isclose(pd.to_numeric(d["level"], errors="coerce"), lv)]
+        return m.iloc[0] if len(m) else None
+
+    def cells(run, method):
+        r0, r1 = get(run, method, 0.0), get(run, method, 0.01)
+        if r0 is None:
+            return None
+        return [f3(r0["auc_fw"]), caught_sd(r0), f3(r0["sg_auc_fw_conn"]), f3(r0["sg_auc_fw_iso"]),
+                f3(r1["auc_fw"]) if r1 is not None else "--", caught_sd(r1) if r1 is not None else "--"]
+
+    spec = [("No graph (depth 0)", "ocgnn_results_gin_all", "Deep SVDD (no graph)")]
+    for enc, run, name in [("GIN", "ocgnn_results_ginmean_all", "OC-GIN"), ("GAT", "ocgnn_results_gat_all", "OC-GAT"),
+                           ("TransformerConv", "ocgnn_results_tconv_all", "OC-TransformerConv"),
+                           ("GraphGPS", "ocgnn_results_gps_all", "OC-GPS")]:
+        for dep in [1, 2]:
+            spec.append((f"{enc}, depth {dep}", run, f"{name}, depth {dep}"))
+    rows = []
+    for lab, run, method in spec:
+        c = cells(run, method)
+        if c is not None:
+            rows.append([lab] + c)
+    rows.append(r"\midrule")
+    rows.append(r"\multicolumn{7}{l}{\textit{GIN with sum aggregation (preliminary comparison)}} \\")
+    for dep in [1, 2]:
+        c = cells("ocgnn_results_gin_all", f"OC-GIN, depth {dep}")
+        if c is not None:
+            rows.append([f"GIN sum, depth {dep}"] + c)
+    table("tab_svdd", "Control with a one-class objective: Deep SVDD on the same encoders (test set, "
+          "family-weighted).", "tab:svdd",
+          ["Encoder", "ROC-AUC", "Caught (\\%)", "Conn. AUC", "Iso. AUC", "AUC 1\\%", "Caught 1\\% (\\%)"],
+          rows, "lcccccc", size=r"\footnotesize",
+          note="Clean training unless marked 1\\% (1\\% contamination). Caught: share of malware flagged at 1\\% "
+               "FPR, mean $\\pm$ standard deviation over 3 seeds; ROC-AUC of the rank-averaged ensemble. Plain "
+               "scores. All encoders use mean aggregation except the last two rows, which differ from the GIN rows "
+               "above only in summing the neighbours.")
+
+
 def style():
     import matplotlib as mpl
     mpl.rcParams.update({
@@ -559,6 +648,8 @@ def main():
     t_contamination()
     t_sensitivity()
     t_label_noise()
+    t_operating()
+    t_svdd()
 
     style()
     f_contamination()
@@ -567,7 +658,7 @@ def main():
     f_newloss_encoders()
 
     doc = [r"\documentclass[11pt]{article}", r"\usepackage[a4paper,margin=2cm]{geometry}",
-           r"\usepackage{booktabs}", r"\usepackage{graphicx}", r"\begin{document}"]
+           r"\usepackage{booktabs}", r"\usepackage{graphicx}", r"\usepackage{adjustbox}", r"\begin{document}"]
     doc += [f"\\input{{tables/{t}}}" for t in TABLES]
     doc += [f"\\begin{{figure}}[htbp]\\centering\\includegraphics[width=\\linewidth]{{figures/{f}.pdf}}"
             f"\\caption{{{esc(f)}}}\\end{{figure}}" for f in FIGS]
