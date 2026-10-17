@@ -117,7 +117,7 @@ SCORERS = ["IF", "LOF", "OCSVM"]
 def view(graph, anchors, depth, rng, device, args, training=True, feat_mask=None, drop_p=0.0, corrupt=False,
          keep=None, reuse=None, own=None):
     """Model inputs for one view of the anchors. feat_mask [F] (1 = keep) or None;
-    drop_p = neighbour-slot dropping; corrupt = DGI row-wise feature shuffling.
+    drop_p = neighbour-slot dropping; corrupt = DGI corruption (feature rows of random training releases).
     keep: dict that receives the sampled tree and memory (to build a shifted copy of this view);
     reuse: such a dict, used instead of sampling (no new random draws);
     own [B, F]: replacement rows for the anchors' own features (shifted copies), also used in
@@ -138,9 +138,11 @@ def view(graph, anchors, depth, rng, device, args, training=True, feat_mask=None
             if args.isolated == "empty":
                 m2 = m2 & ~d2
     if corrupt:
-        # every node's feature row replaced by that of a random training-graph node (structure kept);
-        # context profiles are not recomputed (they belong to other nodes anyway)
-        perm = rng.integers(0, graph.n_train, size=graph.x.shape[0])
+        # every node's feature row replaced by that of a random TRAINING RELEASE, drawn with replacement
+        # (structure kept). Only graph.train_anchors are eligible: drawing from all training-graph nodes
+        # (graph.n_train) also picked context nodes, whose rows carry is_context = 1 and other
+        # context-only values, so the discriminator could reject those negatives from a single feature.
+        perm = graph.train_anchors[rng.integers(0, len(graph.train_anchors), size=graph.x.shape[0])]
         x0 = graph.x[torch.from_numpy(perm[anchors])]
         x1 = graph.x[torch.from_numpy(perm[n1])] if depth >= 1 else None
         x2 = graph.x[torch.from_numpy(perm[n2])] if depth == 2 else None

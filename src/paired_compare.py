@@ -9,7 +9,9 @@ For each comparison A vs B on the same test packages:
     (as bootstrap_ci in baseline_protocol.py), and both methods are evaluated
     on the SAME resample, so shared test-set noise cancels out
   - training-seed variability: in every resample the training seeds of each
-    method are also drawn with replacement (two-level bootstrap), so the CI
+    method are also drawn with replacement (two-level bootstrap; under
+    contamination seed k is the same draw for both methods, so the same seed
+    indices are drawn for both), so the CI
     covers both the choice of test packages and the choice of training seeds.
     With 3 seeds the seed part is coarse; per-seed values are saved as well.
     (--no-seed-resample: package variability only, given the seeds)
@@ -95,13 +97,18 @@ def resample_indices(y, fam, n_boot, seed=0):
     return out
 
 
-def paired_bootstrap(A, B, y, w, boots, metrics=METRICS, seed_resample=True, seed=0):
+def paired_bootstrap(A, B, y, w, boots, metrics=METRICS, seed_resample=True, seed=0, pair_seeds=False):
     """Difference (A - B) of the seed-mean metric, with a paired bootstrap.
     A, B: [n_seeds, n_packages] test scores in the same package order (seed counts
     may differ). seed_resample: also draw each method's training seeds with
-    replacement in every resample (independently for A and B).
+    replacement in every resample (independently for A and B, unless pair_seeds).
+    pair_seeds: seed k of A and seed k of B were trained on the same contamination
+    draw, so the same seed indices are drawn for both (keeps the pairing; needs
+    equal seed counts).
     Returns {metric: dict(a, b, diff, lo, hi, p, boot_sd, a_seeds, b_seeds)}."""
     out = {}
+    if pair_seeds and len(A) != len(B):
+        raise ValueError(f"pair_seeds needs equal seed counts, got {len(A)} and {len(B)}")
     for m in metrics:
         a, b = seed_mean(m, A, y, w), seed_mean(m, B, y, w)
         rs = np.random.RandomState(seed)            # same seed draws for every metric
@@ -109,7 +116,10 @@ def paired_bootstrap(A, B, y, w, boots, metrics=METRICS, seed_resample=True, see
         for k, idx in enumerate(boots):
             ys, ws = y[idx], w[idx]
             sa = rs.randint(0, len(A), len(A)) if seed_resample else np.arange(len(A))
-            sb = rs.randint(0, len(B), len(B)) if seed_resample else np.arange(len(B))
+            if pair_seeds:
+                sb = sa                                  # same contamination draws for both methods
+            else:
+                sb = rs.randint(0, len(B), len(B)) if seed_resample else np.arange(len(B))
             d[k] = seed_mean(m, A[sa][:, idx], ys, ws) - seed_mean(m, B[sb][:, idx], ys, ws)
         n = len(d)
         # two-sided p of H0 "difference = 0": twice the smaller tail, +1 correction
@@ -202,6 +212,23 @@ def load_scores(spec, results_dir, test_paths):
     return np.vstack(rows), label
 
 
+def spec_level(spec):
+    """Contamination level of a method spec (a best_of list shares one level)."""
+    if "best_of" in spec:
+        levels = {float(c["level"]) for c in spec["best_of"]}
+        if len(levels) != 1:
+            raise ValueError(f"best_of candidates at different levels: {sorted(levels)}")
+        return levels.pop()
+    return float(spec["level"])
+
+
+def same_draws(sa, sb):
+    """Seed k of both methods used contamination draw k (bundle graph_cXX_s{k}.pt): true at the
+    same level above 0. At level 0 every seed uses the same clean graph, so seeds are not paired."""
+    la, lb = spec_level(sa), spec_level(sb)
+    return la > 0 and np.isclose(la, lb)
+
+
 def load_test_data():
     """Test packages, labels, family weights and families: the same as gnn_eval.Evaluator."""
     from baseline_protocol import DATA_DIR, SPLIT_FILE, load_features
@@ -237,14 +264,16 @@ def run(spec_file, results_dir, test_data, boot=None, seed_resample=None):
                 A, la = load_scores(c["a"], results_dir, paths)
                 B, lb = load_scores(c["b"], results_dir, paths)
                 print(f"  computing {la} vs {lb}", flush=True)
+                pair = seed_resample and same_draws(c["a"], c["b"]) and len(A) == len(B)
                 cache[key] = (la, lb, paired_bootstrap(A, B, y, w, boots, seed_resample=seed_resample,
-                                                       seed=spec.get("bootstrap_seed", 0)))
+                                                       seed=spec.get("bootstrap_seed", 0), pair_seeds=pair))
             la, lb, res = cache[key]
             r = res[c["metric"]]
             fam_rows.append({"family": family, "id": c["id"], "question": c.get("question", ""),
                              "metric": c["metric"], "a": la, "b": lb, "a_value": r["a"], "b_value": r["b"],
                              "diff": r["diff"], "ci_lo": r["lo"], "ci_hi": r["hi"], "p": r["p"],
                              "boot_sd": r["boot_sd"], "seeds_resampled": seed_resample,
+                             "seeds_paired": bool(seed_resample and same_draws(c["a"], c["b"])),
                              "a_per_seed": " ".join(f"{v:.4f}" for v in r["a_seeds"]),
                              "b_per_seed": " ".join(f"{v:.4f}" for v in r["b_seeds"])})
         adj = holm([r["p"] for r in fam_rows])

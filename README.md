@@ -128,9 +128,11 @@ Analyses that led to the final design but are not part of the main results:
 `artifact_twins_check.py`, `twins_vs_detector_check.py`, `relation_check.py`
 (Slurm: `artifact_twins.sh`, `twins_vs_detector.sh`, `relation_check.sh`).
 `slurm/train_ocgnn.sh` is the superseded first one-class run.
-`baseline_experiment.py`, `build_features.py` and `parse_malregistry.py`
-belong to an earlier version of the project (deps.dev graph) and are kept for
-reference.
+`build_features.py` and `parse_malregistry.py` belong to an earlier version
+of the project (deps.dev graph) and are kept for reference.
+`baseline_experiment.py` dates from that version too, but is still part of the
+pipeline: `build_graph.py` and `make_campaign_splits.py` import its `load()`
+function and feature-column constants.
 
 ## Results and thesis tables
 

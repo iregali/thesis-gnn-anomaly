@@ -301,18 +301,33 @@ def train(graph, p2, seed, epochs, batch, lr, device):
 
 @torch.no_grad()
 def score(model, graph, query_nodes, p2, seed, rounds, batch, device):
-    """CoLA anomaly score: mean over rounds of s(v, r(other)) - s(v, r(v))."""
+    """CoLA anomaly score: mean over rounds of s(v, r(u)) - s(v, r(v)) (discriminator logits).
+
+    The negative subgraph r(u) is sampled around a TRAINING release u drawn at random,
+    never around another query (validation / test) release, so the score of a held-out
+    release depends only on the release and the training graph, not on which other
+    held-out releases happen to share its batch (inductive protocol)."""
     model.eval()
     rng = np.random.default_rng(10_000 + seed)
+    pool = graph.train_anchors
     out = np.zeros(len(query_nodes))
     for _ in range(rounds):
         perm = rng.permutation(len(query_nodes))
         for a in range(0, len(perm), batch):
             idx = perm[a:a + batch]
-            nodes, pad = graph.sample(query_nodes[idx], p2, rng)
+            q = query_nodes[idx]
+            nodes, pad = graph.sample(q, p2, rng)
             X, xt = batch_tensors(graph, nodes, pad, device)
-            pos, neg = model(X, xt)
-            out[idx] += (neg - pos).cpu().numpy()
+            h, r_own = model.embed(X, xt)
+            other = pool[rng.integers(0, len(pool), size=len(idx))]
+            same = other == q                      # only possible if a training release is queried
+            while same.any():
+                other[same] = pool[rng.integers(0, len(pool), size=int(same.sum()))]
+                same = other == q
+            n_o, pad_o = graph.sample(other, p2, rng)
+            X_o, xt_o = batch_tensors(graph, n_o, pad_o, device)
+            _, r_other = model.embed(X_o, xt_o)
+            out[idx] += (model.disc(h, r_other) - model.disc(h, r_own)).cpu().numpy()
     model.train()
     return out / rounds
 

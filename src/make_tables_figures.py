@@ -164,7 +164,7 @@ def t_baselines():
                 rows.append([lab, ci3(r), f"{pct(r['tpr1_fw'])} [{pct(r['tpr_fw_lo'])}, {pct(r['tpr_fw_hi'])}]",
                              f3(r["sg_auc_fw_conn"]), f3(r["sg_auc_fw_iso"])])
     rows.append(r"\midrule")
-    rows.append(["GuardDog rule (any rule fires)", ci3(gd), "--", f3(gd["sg_auc_fw_conn"]), f3(gd["sg_auc_fw_iso"])])
+    rows.append(["GuardDog (findings + flag)", ci3(gd), "--", f3(gd["sg_auc_fw_conn"]), f3(gd["sg_auc_fw_iso"])])
     rf = baseline("RandomForest (supervised reference)", None)
     rows.append(["Random Forest, supervised (reference)", ci3(rf),
                  f"{pct(rf['tpr1_fw'])} [{pct(rf['tpr_fw_lo'])}, {pct(rf['tpr_fw_hi'])}]",
@@ -173,8 +173,10 @@ def t_baselines():
           "tab:baselines", ["Detector", "ROC-AUC [95\\% CI]", "Caught (\\%) [95\\% CI]",
                             "Conn. AUC", "Iso. AUC"], rows, "lcccc", size=r"\footnotesize",
           note="Settings chosen on validation (pAUC up to 5\\% FPR). Caught: family-weighted share of malware "
-               "flagged at a 1\\% false-positive rate. Connected / isolated: packages with / without dependency "
-               "relations to the training graph. Scores of the 3 seeds are rank-averaged (ensemble); the "
+               "flagged at a 1\\% false-positive rate. Connected / isolated: releases with / without dependency "
+               "relations to the normal training releases. GuardDog is ranked by its number of findings plus "
+               "the flag for the ROC AUC; as a binary rule it has a single operating point (its own FPR, "
+               "Table~\\ref{tab:operating}), so no caught value at 1\\% FPR is given. Scores of the 3 seeds are rank-averaged (ensemble); the "
                "One-Class SVM is deterministic, so its seeds coincide. The supervised reference uses labelled malware and is not "
                "comparable to the unsupervised detectors.")
 
@@ -245,7 +247,8 @@ def t_capacity():
     rows.append(["\\multicolumn{2}{l}{Raw One-Class SVM}", f3(ref["auc_fw"]), pct(ref["tpr1_fw_seed_mean"]),
                  f3(ref["sg_auc_fw_conn"]), f3(ref["sg_auc_fw_iso"])])
     table("tab_capacity", "Capacity check: depth-1 embeddings are twice as large (own-feature projection + "
-          "neighbourhood). Giving the no-graph model the same size removes most of the graph's apparent gain.",
+          "neighbourhood). The no-graph model is also trained at the same total size, to separate the effect "
+          "of the graph from that of the embedding size.",
           "tab:capacity", ["Loss", "Model (One-Class SVM scorer)", "ROC-AUC", "Caught (\\%)", "Connected AUC",
                            "Isolated AUC"], rows, "llcccc",
           note="Clean training, diagnostic runs (not chosen on validation). Isolated packages have no "
@@ -328,12 +331,17 @@ def t_settings():
         rows.append([Ln, str(int(a["epochs"])), str(int(a["dim"])), f"{a['lr']:g}", f3(a["val_pauc_mean"]),
                      f"{pct(b['nu'], 0)}\\%", str(int(b["k"])), "--" if L == "dgi" else f"{b['weight']:g}",
                      f3(b["val_pauc_mean"])])
-    table("tab_settings", "Settings chosen on validation (mean pAUC up to 5\\% FPR over 3 seeds, GIN depth 1, "
-          "clean training).", "tab:settings",
+    table("tab_settings", "Settings chosen on validation (mean pAUC up to 5\\% FPR over 3 seeds, One-Class SVM scorer, "
+          "GIN depth 1, clean training).", "tab:settings",
           ["Loss", "Epochs", "Size", "LR", "Val. pAUC", "$\\nu$", "$K$", "$\\lambda$ / $\\beta$",
            "Val. pAUC (N3)"], rows, "lcccccccc",
           note="Left: training settings of the base losses (grid of 18 per loss). Right: settings of the proposed "
-               "loss (grid of 18 for InfoNCE / Triplet, 6 for DGI), used for N1--N4.")
+               "loss (grid of 18 for InfoNCE / Triplet, 6 for DGI), used for N1--N4. Size: width of each part of "
+               "the embedding; at depth $\\geq 1$ the own-feature projection and the graph output are "
+               "concatenated, so the embedding is twice this size.")
+
+
+SENS_EXCLUDED = {}   # tag -> features without a defined gain (filled by sens_summary)
 
 
 def sens_summary(tag):
@@ -341,7 +349,10 @@ def sens_summary(tag):
     if d is None:
         return None
     m = (d.groupby(["depth", "feature"])[["variability", "separation", "gain_trained", "ratio"]].mean()
-         .reset_index().dropna(subset=["gain_trained"]))
+         .reset_index())
+    undef = m[(m["depth"] == 1) & m["gain_trained"].isna() & (m["feature"] != "is_context")]["feature"]
+    SENS_EXCLUDED[tag] = sorted(undef)
+    m = m.dropna(subset=["gain_trained"])
     m = m[(m["feature"] != "is_context") & (m["depth"] == 1)]
     m["group"] = pd.cut(m["variability"], [-0.01, 0.05, 0.25, 1.0], labels=["almost constant", "rare", "common"])
     return m
@@ -367,7 +378,19 @@ def t_sensitivity():
           "tab:sensitivity", ["Feature group", "Features", "Gain (base)", "Ratio (base)", "Gain (N3)",
                               "Ratio (N3)"], rows, "lccccc",
           note="Gain: embedding movement per unit feature change (malware-like values), normalised by the "
-               "embedding spread. Ratio: trained / untrained gain. Means over features and 3 seeds.")
+               "embedding spread. Ratio: trained / untrained gain. Means over features and 3 seeds. "
+               + sens_excluded_note())
+
+
+def sens_excluded_note():
+    """Which non-indicator features are missing from the table, and why."""
+    und = sorted(set(SENS_EXCLUDED.get("_triplet_gin_tuned", [])) | set(SENS_EXCLUDED.get("_triplet_gin_n3", [])))
+    txt = "The context indicator \\texttt{is\\_context} is not a release feature and is excluded."
+    if und:
+        names = ", ".join(f"\\texttt{{{esc(f)}}}" for f in und)
+        txt += (f" Also excluded: {names}, whose gain is undefined because the malware values drawn never "
+                f"differ from the normal ones (almost every release has the same value).")
+    return txt
 
 
 def t_label_noise():
@@ -420,7 +443,7 @@ def t_operating():
     p, t = gd["prec@ownFPR_per_project_1:65"], gd["tpr_gd"]
     gd_fpr = t * PI_PROJECT * (1 - p) / (p * (1 - PI_PROJECT))
     rows = [r"\multicolumn{8}{l}{\textit{Clean training}} \\",
-            ["GuardDog rule (any rule fires)", f3(gd["auc_fw"]), "--", "--", "--",
+            ["GuardDog (findings + flag)", f3(gd["auc_fw"]), "--", "--", "--",
              f"{pct(gd['tpr_gd_fw'])} (FPR {pct(gd_fpr)})", "0.0",
              f"{pct(precision(gd['tpr_gd_fw'], gd_fpr))} (own FPR)"]]
 
@@ -465,7 +488,8 @@ def t_svdd():
         if r0 is None:
             return None
         return [f3(r0["auc_fw"]), caught_sd(r0), f3(r0["sg_auc_fw_conn"]), f3(r0["sg_auc_fw_iso"]),
-                f3(r1["auc_fw"]) if r1 is not None else "--", caught_sd(r1) if r1 is not None else "--"]
+                f3(r1["auc_fw"]) if r1 is not None else "--", caught_sd(r1) if r1 is not None else "--",
+                f3(r1["sg_auc_fw_conn"]) if r1 is not None else "--"]
 
     spec = [("No graph (depth 0)", "ocgnn_results_gin_all", "Deep SVDD (no graph)")]
     for enc, run, name in [("GIN", "ocgnn_results_ginmean_all", "OC-GIN"), ("GAT", "ocgnn_results_gat_all", "OC-GAT"),
@@ -479,16 +503,18 @@ def t_svdd():
         if c is not None:
             rows.append([lab] + c)
     rows.append(r"\midrule")
-    rows.append(r"\multicolumn{7}{l}{\textit{GIN with sum aggregation (preliminary comparison)}} \\")
+    rows.append(r"\multicolumn{8}{l}{\textit{GIN with sum aggregation (preliminary comparison)}} \\")
     for dep in [1, 2]:
         c = cells("ocgnn_results_gin_all", f"OC-GIN, depth {dep}")
         if c is not None:
             rows.append([f"GIN sum, depth {dep}"] + c)
     table("tab_svdd", "Control with a one-class objective: Deep SVDD on the same encoders (test set, "
           "family-weighted).", "tab:svdd",
-          ["Encoder", "ROC-AUC", "Caught (\\%)", "Conn. AUC", "Iso. AUC", "AUC 1\\%", "Caught 1\\% (\\%)"],
-          rows, "lcccccc", size=r"\footnotesize",
-          note="Clean training unless marked 1\\% (1\\% contamination). Caught: share of malware flagged at 1\\% "
+          ["Encoder", "ROC-AUC", "Caught (\\%)", "Conn. AUC", "Iso. AUC", "AUC 1\\%", "Caught 1\\% (\\%)",
+           "Conn. 1\\%"],
+          rows, "lccccccc", size=r"\footnotesize",
+          note="Clean training unless marked 1\\% (1\\% contamination); Conn. 1\\%: ROC AUC on connected "
+               "releases at 1\\% contamination. Caught: share of malware flagged at 1\\% "
                "FPR, mean $\\pm$ standard deviation over 3 seeds; ROC-AUC of the rank-averaged ensemble. Plain "
                "scores. All encoders use mean aggregation except the last two rows, which differ from the GIN rows "
                "above only in summing the neighbours.")
