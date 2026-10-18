@@ -114,6 +114,23 @@ SCORERS = ["IF", "LOF", "OCSVM"]
 # ---------------------------------------------------------------------------
 # Views
 # ---------------------------------------------------------------------------
+def corruption_rows(graph, rng):
+    """Random replacement row for every node, drawn from training nodes of the same kind."""
+    pools = getattr(graph, "_corrupt_pools", None)
+    if pools is None:
+        rel = graph.train_anchors                                   # training releases
+        ctx = np.setdiff1d(np.arange(graph.n_train), rel)           # training context nodes
+        is_ctx = np.zeros(graph.x.shape[0], dtype=bool)
+        is_ctx[ctx] = True
+        is_ctx[graph.n_train + graph.n_held:] = True                # context nodes added for held-out deps
+        pools = graph._corrupt_pools = (rel, ctx, np.flatnonzero(is_ctx))
+    rel, ctx, ctx_pos = pools
+    perm = rel[rng.integers(0, len(rel), size=graph.x.shape[0])]
+    if len(ctx):
+        perm[ctx_pos] = ctx[rng.integers(0, len(ctx), size=len(ctx_pos))]
+    return perm
+
+
 def view(graph, anchors, depth, rng, device, args, training=True, feat_mask=None, drop_p=0.0, corrupt=False,
          keep=None, reuse=None, own=None):
     """Model inputs for one view of the anchors. feat_mask [F] (1 = keep) or None;
@@ -138,11 +155,13 @@ def view(graph, anchors, depth, rng, device, args, training=True, feat_mask=None
             if args.isolated == "empty":
                 m2 = m2 & ~d2
     if corrupt:
-        # every node's feature row replaced by that of a random TRAINING RELEASE, drawn with replacement
-        # (structure kept). Only graph.train_anchors are eligible: drawing from all training-graph nodes
-        # (graph.n_train) also picked context nodes, whose rows carry is_context = 1 and other
-        # context-only values, so the discriminator could reject those negatives from a single feature.
-        perm = graph.train_anchors[rng.integers(0, len(graph.train_anchors), size=graph.x.shape[0])]
+        # DGI corruption: every node's feature row is replaced by that of a random training node OF THE
+        # SAME KIND, drawn with replacement (structure kept): releases get rows of training releases,
+        # context nodes rows of training context nodes. Drawing from all nodes would put context rows
+        # (is_context = 1) at release positions; drawing only releases would leave a corrupted
+        # neighbourhood without any context node. Either way the discriminator could reject the
+        # corrupted view from the context indicator alone instead of from the feature values.
+        perm = corruption_rows(graph, rng)
         x0 = graph.x[torch.from_numpy(perm[anchors])]
         x1 = graph.x[torch.from_numpy(perm[n1])] if depth >= 1 else None
         x2 = graph.x[torch.from_numpy(perm[n2])] if depth == 2 else None
