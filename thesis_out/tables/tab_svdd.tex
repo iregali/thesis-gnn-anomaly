@@ -4,26 +4,26 @@
 \caption{Control with a one-class objective: Deep SVDD on the same encoders (test set, family-weighted).}
 \label{tab:svdd}
 \begin{adjustbox}{max width=\linewidth}
-\begin{tabular}{lcccccc}
+\begin{tabular}{lccccccc}
 \toprule
-Encoder & ROC-AUC & Caught (\%) & Conn. AUC & Iso. AUC & AUC 1\% & Caught 1\% (\%) \\
+Encoder & ROC-AUC & Caught (\%) & Conn. AUC & Iso. AUC & AUC 1\% & Caught 1\% (\%) & Conn. 1\% \\
 \midrule
-No graph (depth 0) & 0.955 & 52.4 $\pm$ 3.8 & 0.919 & 0.969 & 0.864 & 14.4 $\pm$ 4.4 \\
-GIN, depth 1 & 0.937 & 48.2 $\pm$ 12.4 & 0.861 & 0.962 & 0.834 & 5.7 $\pm$ 2.0 \\
-GIN, depth 2 & 0.952 & 58.1 $\pm$ 8.5 & 0.903 & 0.964 & 0.835 & 15.0 $\pm$ 1.9 \\
-GAT, depth 1 & 0.801 & 41.3 $\pm$ 14.7 & 0.435 & 0.909 & 0.787 & 21.0 $\pm$ 12.8 \\
-GAT, depth 2 & 0.941 & 59.9 $\pm$ 3.7 & 0.858 & 0.968 & 0.819 & 10.1 $\pm$ 5.0 \\
-TransformerConv, depth 1 & 0.888 & 58.8 $\pm$ 5.2 & 0.813 & 0.949 & 0.874 & 25.7 $\pm$ 19.9 \\
-TransformerConv, depth 2 & 0.936 & 34.0 $\pm$ 11.1 & 0.858 & 0.963 & 0.659 & 8.0 $\pm$ 0.8 \\
-GraphGPS, depth 1 & 0.940 & 49.0 $\pm$ 12.4 & 0.861 & 0.966 & 0.870 & 6.8 $\pm$ 2.0 \\
-GraphGPS, depth 2 & 0.957 & 49.6 $\pm$ 2.9 & 0.922 & 0.969 & 0.877 & 15.4 $\pm$ 5.4 \\
+No graph (depth 0) & 0.955 & 52.4 $\pm$ 3.8 & 0.919 & 0.969 & 0.864 & 14.4 $\pm$ 4.4 & 0.908 \\
+GIN, depth 1 & 0.937 & 48.2 $\pm$ 12.4 & 0.861 & 0.962 & 0.834 & 5.7 $\pm$ 2.0 & 0.854 \\
+GIN, depth 2 & 0.952 & 58.1 $\pm$ 8.5 & 0.903 & 0.964 & 0.835 & 15.0 $\pm$ 1.9 & 0.892 \\
+GAT, depth 1 & 0.801 & 41.3 $\pm$ 14.7 & 0.435 & 0.909 & 0.787 & 21.0 $\pm$ 12.8 & 0.427 \\
+GAT, depth 2 & 0.941 & 59.9 $\pm$ 3.7 & 0.858 & 0.968 & 0.819 & 10.1 $\pm$ 5.0 & 0.834 \\
+TransformerConv, depth 1 & 0.888 & 58.8 $\pm$ 5.2 & 0.813 & 0.949 & 0.874 & 25.7 $\pm$ 19.9 & 0.799 \\
+TransformerConv, depth 2 & 0.936 & 34.0 $\pm$ 11.1 & 0.858 & 0.963 & 0.659 & 8.0 $\pm$ 0.8 & 0.839 \\
+GraphGPS, depth 1 & 0.940 & 49.0 $\pm$ 12.4 & 0.861 & 0.966 & 0.870 & 6.8 $\pm$ 2.0 & 0.855 \\
+GraphGPS, depth 2 & 0.957 & 49.6 $\pm$ 2.9 & 0.922 & 0.969 & 0.877 & 15.4 $\pm$ 5.4 & 0.904 \\
 \midrule
-\multicolumn{7}{l}{\textit{GIN with sum aggregation (preliminary comparison)}} \\
-GIN sum, depth 1 & 0.885 & 44.4 $\pm$ 9.8 & 0.683 & 0.966 & 0.755 & 7.3 $\pm$ 1.2 \\
-GIN sum, depth 2 & 0.897 & 45.7 $\pm$ 11.9 & 0.703 & 0.965 & 0.649 & 5.4 $\pm$ 0.2 \\
+\multicolumn{8}{l}{\textit{GIN with sum aggregation (preliminary comparison)}} \\
+GIN sum, depth 1 & 0.885 & 44.4 $\pm$ 9.8 & 0.683 & 0.966 & 0.755 & 7.3 $\pm$ 1.2 & 0.685 \\
+GIN sum, depth 2 & 0.897 & 45.7 $\pm$ 11.9 & 0.703 & 0.965 & 0.649 & 5.4 $\pm$ 0.2 & 0.687 \\
 \bottomrule
 \end{tabular}
 \end{adjustbox}
 \par\smallskip
-\parbox{0.95\linewidth}{\footnotesize Clean training unless marked 1\% (1\% contamination). Caught: share of malware flagged at 1\% FPR, mean $\pm$ standard deviation over 3 seeds; ROC-AUC of the rank-averaged ensemble. Plain scores. All encoders use mean aggregation except the last two rows, which differ from the GIN rows above only in summing the neighbours.}
+\parbox{0.95\linewidth}{\footnotesize Clean training unless marked 1\% (1\% contamination); Conn. 1\%: ROC AUC on connected releases at 1\% contamination. Caught: share of malware flagged at 1\% FPR, mean $\pm$ standard deviation over 3 seeds; ROC-AUC of the rank-averaged ensemble. Plain scores. All encoders use mean aggregation except the last two rows, which differ from the GIN rows above only in summing the neighbours.}
 \end{table}

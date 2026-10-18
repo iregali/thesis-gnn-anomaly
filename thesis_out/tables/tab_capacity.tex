@@ -1,7 +1,7 @@
 \begin{table}[htbp]
 \centering
 \small
-\caption{Capacity check: depth-1 embeddings are twice as large (own-feature projection + neighbourhood). Giving the no-graph model the same size removes most of the graph's apparent gain.}
+\caption{Capacity check: depth-1 embeddings are twice as large (own-feature projection + neighbourhood). The no-graph model is also trained at the same total size, to separate the effect of the graph from that of the embedding size.}
 \label{tab:capacity}
 \begin{adjustbox}{max width=\linewidth}
 \begin{tabular}{llcccc}
@@ -16,9 +16,9 @@ Triplet & No graph, tuned size & 0.953 & 66.2 & 0.917 & 0.963 \\
 Triplet & No graph, size 256 & 0.955 & 73.2 & 0.921 & 0.966 \\
 Triplet & GIN depth 1, tuned size & 0.962 & 74.3 & 0.925 & 0.970 \\
 \addlinespace
-DGI & No graph, tuned size & 0.952 & 70.2 & 0.913 & 0.967 \\
-DGI & No graph, size 256 & 0.958 & 73.2 & 0.918 & 0.973 \\
-DGI & GIN depth 1, tuned size & 0.958 & 71.6 & 0.910 & 0.971 \\
+DGI & No graph, tuned size & 0.957 & 73.6 & 0.922 & 0.969 \\
+DGI & No graph, size 256 & 0.955 & 73.9 & 0.915 & 0.970 \\
+DGI & GIN depth 1, tuned size & 0.962 & 74.5 & 0.921 & 0.973 \\
 \addlinespace
 \multicolumn{2}{l}{Raw One-Class SVM} & 0.963 & 73.9 & 0.935 & 0.971 \\
 \bottomrule

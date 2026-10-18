@@ -9,7 +9,7 @@
 Detector & ROC-AUC & 0.5\% & 1\% & 2\% & At GD FPR & Hard, 1\% & Prec. 1:65 \\
 \midrule
 \multicolumn{8}{l}{\textit{Clean training}} \\
-GuardDog rule (any rule fires) & 0.902 & -- & -- & -- & 83.6 (FPR 5.0) & 0.0 & 20.8 (own FPR) \\
+GuardDog (findings + flag) & 0.902 & -- & -- & -- & 83.6 (FPR 5.0) & 0.0 & 20.8 (own FPR) \\
 One-Class SVM, raw features & 0.963 & 47.4 & 73.9 & 76.3 & 84.7 & 32.7 & 53.6 \\
 Triplet + GIN, tuned base [OCSVM, depth 1] & 0.962 & 66.0 & 76.3 & 78.9 & 85.5 & 38.7 & 54.4 \\
 Triplet + GIN, N3 [OCSVM, depth 1] & 0.964 & 66.7 & 74.5 & 81.9 & 86.7 & 19.2 & 53.8 \\

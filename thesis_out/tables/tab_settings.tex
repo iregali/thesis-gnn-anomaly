@@ -1,7 +1,7 @@
 \begin{table}[htbp]
 \centering
 \small
-\caption{Settings chosen on validation (mean pAUC up to 5\% FPR over 3 seeds, GIN depth 1, clean training).}
+\caption{Settings chosen on validation (mean pAUC up to 5\% FPR over 3 seeds, One-Class SVM scorer, GIN depth 1, clean training).}
 \label{tab:settings}
 \begin{adjustbox}{max width=\linewidth}
 \begin{tabular}{lcccccccc}
@@ -10,10 +10,10 @@ Loss & Epochs & Size & LR & Val. pAUC & $\nu$ & $K$ & $\lambda$ / $\beta$ & Val.
 \midrule
 InfoNCE & 100 & 64 & 0.001 & 0.861 & 2\% & 1 & 2 & 0.873 \\
 Triplet & 25 & 128 & 0.001 & 0.866 & 2\% & 1 & 2 & 0.887 \\
-DGI & 100 & 128 & 0.001 & 0.865 & 10\% & 4 & -- & 0.874 \\
+DGI & 100 & 128 & 0.0003 & 0.873 & 10\% & 4 & -- & 0.869 \\
 \bottomrule
 \end{tabular}
 \end{adjustbox}
 \par\smallskip
-\parbox{0.95\linewidth}{\footnotesize Left: training settings of the base losses (grid of 18 per loss). Right: settings of the proposed loss (grid of 18 for InfoNCE / Triplet, 6 for DGI), used for N1--N4.}
+\parbox{0.95\linewidth}{\footnotesize Left: training settings of the base losses (grid of 18 per loss). Right: settings of the proposed loss (grid of 18 for InfoNCE / Triplet, 6 for DGI), used for N1--N4. Size: width of each part of the embedding; at depth $\geq 1$ the own-feature projection and the graph output are concatenated, so the embedding is twice this size.}
 \end{table}
