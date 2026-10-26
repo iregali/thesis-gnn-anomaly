@@ -204,6 +204,8 @@ def load_scores(spec, results_dir, test_paths):
                          dtype={"path": str})
         sc = sc[_close(sc["level"], spec["level"]) & (sc["detector"] == spec["detector"])
                 & (sc["variant"] == spec["variant"]) & (sc["features"] == spec["features"])]
+        if "split" in sc.columns:          # newer score files also hold validation scores
+            sc = sc[sc["split"] == "test"]
         label = f"{spec['detector']} {spec['variant']} ({spec['features']})"
     else:
         raise ValueError(f"unknown spec type: {spec}")

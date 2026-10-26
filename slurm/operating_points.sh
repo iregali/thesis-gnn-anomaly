@@ -4,7 +4,8 @@
 #SBATCH --cpus-per-task=4
 #SBATCH --time=01:30:00
 #SBATCH --output=logs/%x_%j.out
-# Revision (Oct 2026): detection across false-positive rates, from the saved scores (no training).
+# Revision (Oct 2026): detection across false-positive rates and thresholds fixed in advance on
+# validation normals, from the saved scores (no training).
 # Needs: baseline_protocol_scores_ops.csv (slurm/ops_scores.sh); contrastive_scores_triplet_gin_{tuned,n3}.csv,
 # and their _c25 versions. Missing inputs are skipped.
 source ~/setup_env.sh

@@ -1,8 +1,8 @@
 """
 operating_points.py  (revision, October 2026)
-Detection across operating points from the saved per-package scores. Answers the supervisors' point
-on the contamination results (neighbouring false-positive rates, subgroup calibration of the proposed
-model).
+Detection across operating points, and with a threshold fixed in advance, from the saved per-package
+scores. Answers the supervisors' points on the contamination results (neighbouring false-positive
+rates, subgroup calibration of the proposed model) and on the practical meaning of the threshold.
 No training: it only re-reads score files.
 
 For every method x contamination level x training seed:
@@ -11,6 +11,9 @@ For every method x contamination level x training seed:
                  quantile of the NORMAL TEST scores (the convention of the thesis, eq. 9);
                  alpha on a grid from 0.2% to 5% (detection-vs-FPR curve)
   caught_ens     caught of the rank-averaged seed ensemble (as Table 6)
+  deploy_*       threshold fixed IN ADVANCE: (1 - alpha) quantile of the normal VALIDATION scores, applied
+                 unchanged to the test set; deploy_fpr = the false-positive rate it actually gives on the
+                 normal test releases, deploy_caught = what it catches
 Reported as mean and sd over the 3 seeds (+ per-seed values), for plain and subgroup-calibrated scores.
 
 Methods (skipped with a message when their score file is missing)
@@ -70,15 +73,21 @@ def _wshare(hit, w):
     return float(np.sum(w * hit) / np.sum(w)) if len(w) else np.nan
 
 
-def seed_metrics(st, y, w, curve_alphas=CURVE_ALPHAS):
-    """Metrics of one seed. st: test scores (higher = more anomalous), in the order of y.
-    w: family weights of the test releases.
+def seed_metrics(sv, st, y_val, y, w, curve_alphas=CURVE_ALPHAS, table_alphas=TABLE_ALPHAS):
+    """Metrics of one seed. sv / st: validation / test scores (higher = more anomalous), in the order
+    of y_val / y. w: family weights of the test releases.
     Returns {(metric, alpha): value}."""
     out = {("auc", 0.0): float(roc_auc_score(y, st, sample_weight=w))}   # family-weighted ROC-AUC
     neg, pos = st[y == 0], y == 1
     s_pos, w_pos = st[pos], w[pos]
+    v_neg = sv[y_val == 0]
     for a in curve_alphas:
         out[("caught", a)] = _wshare(s_pos > np.quantile(neg, 1 - a), w_pos)
+    for a in table_alphas:
+        thr_v = np.quantile(v_neg, 1 - a)            # fixed in advance, on validation normals
+        out[("deploy_fpr", a)] = float(np.mean(neg > thr_v))
+        hit_v = s_pos > thr_v
+        out[("deploy_caught", a)] = _wshare(hit_v, w_pos)
     return out
 
 
@@ -151,10 +160,13 @@ def baseline_seeds(detector, variant, features, level, val_paths, test_paths):
     if not os.path.exists(f"{RESULTS_DIR}/{name}"):
         return None
     sc = _read(name)
-    split = "test" if "split" in sc.columns else None   # older score files hold test scores only
+    if "split" not in sc.columns:
+        raise SystemExit(f"{name} has no validation scores: rerun slurm/ops_scores.sh with the updated "
+                         f"baseline_protocol.py")
     sc = sc[np.isclose(sc["level"].astype(float), level) & (sc["detector"] == detector)
             & (sc["variant"] == variant) & (sc["features"] == features)]
-    out = {int(seed): (None, _ordered(g, split, test_paths, detector)) for seed, g in sc.groupby("seed")}
+    out = {int(seed): (_ordered(g, "val", val_paths, detector), _ordered(g, "test", test_paths, detector))
+           for seed, g in sc.groupby("seed")}
     return out or None
 
 
@@ -203,7 +215,7 @@ def check_against_results(tag, level, config, plain, cal):
 
 # ---------------------------------------------------------------------------
 def main():
-    ap = argparse.ArgumentParser(description="Detection across operating points (revision)")
+    ap = argparse.ArgumentParser(description="Operating points and thresholds fixed in advance (revision)")
     ap.add_argument("--levels", type=float, nargs="*", default=LEVELS)
     ap.add_argument("--no-calibration", action="store_true", help="skip calibrated contrastive rows (no bundles)")
     args = ap.parse_args()
@@ -214,14 +226,16 @@ def main():
     rows = []
 
     def add(level, method, calibrated, guarddog, source, config, seeds):
-        per = [seed_metrics(st, y, w) for _, st in seeds.values()]
+        per = [seed_metrics(sv, st, y_val, y, w) for sv, st in seeds.values()]
         ens = ensemble_metrics([st for _, st in seeds.values()], y, w)
         for r in summarise(per, ens):
             rows.append({"level": level, "method": method, "calibrated": calibrated, "guarddog": guarddog,
                          "source": source, "config": config, **r})
         m1 = float(np.mean([p[("caught", 0.01)] for p in per]))
+        dep = float(np.mean([p[("deploy_caught", 0.01)] for p in per]))
+        fpr = float(np.mean([p[("deploy_fpr", 0.01)] for p in per]))
         print(f"  {level:.0%} | {method}{', calibrated' if calibrated else ''}"
-              f" [{config}]: caught@1% {m1:.1%}",
+              f" [{config}]: caught@1% {m1:.1%} | threshold from validation: FPR {fpr:.2%}, caught {dep:.1%}",
               flush=True)
         return m1
 

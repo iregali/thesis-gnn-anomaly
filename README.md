@@ -116,6 +116,7 @@ Scripts are in `src/`, Slurm job scripts in `slurm/`.
 | 19. Diagnostics | `sensitivity_check.py`, `train_contrastive.py` | `sensitivity_check.sh`, `augmentation_checks.sh` | `sensitivity_check_*`, `*_mask*`, `*_tau*` |
 | 20. Label noise | `label_noise_check.py` | `label_noise.sh` | `label_noise_summary.csv` |
 | 22. Revision, point 3: detection across operating points | `operating_points.py`, `paired_compare.py` (0.5 / 2 / 5% FPR) | `ops_scores.sh`, `operating_points.sh`, `paired_compare_ops.sh` | `operating_points.csv`, `paired_comparisons_ops.csv` |
+| 23. Revision, point 4: thresholds fixed in advance | `baseline_protocol.py --save-scores` (now also validation scores), `operating_points.py` | `ops_scores.sh`, `operating_points.sh` | `operating_points.csv` (`deploy_*` rows) |
 | 21. Tables and figures | `make_tables_figures.py` | (no Slurm, runs anywhere) | `thesis_out/` |
 
 Supporting modules: `gnn_eval.py` (shared evaluation), `train_ocgnn.py`

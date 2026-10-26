@@ -469,8 +469,8 @@ def main():
     ap.add_argument("--detectors", nargs="*", default=["IF", "LOF", "OCSVM", "PEER"],
                     choices=["IF", "LOF", "OCSVM", "PEER"])
     ap.add_argument("--save-scores", action="store_true",
-                    help="also save per-seed test scores (baseline_protocol_scores{tag}.csv) for "
-                         "paired comparisons with paired_compare.py")
+                    help="also save per-seed validation and test scores (baseline_protocol_scores{tag}.csv, "
+                         "column split) for paired_compare.py and operating_points.py")
     args = ap.parse_args()
     args.levels = sorted(args.levels)
     if "fixed" in args.variants and (0.0 not in args.levels or "naive" not in args.variants):
@@ -582,8 +582,14 @@ def main():
     labels = {"naive": "", "robust": "+robust", "fixed": " [0% settings]", "split": " per subgroup"}
 
     store = {}        # (level, set, kind, variant) -> per-seed (val scores, test scores)
-    score_rows = []   # --save-scores: per-seed test scores (naive / robust / fixed variants)
+    score_rows = []   # --save-scores: per-seed validation and test scores (naive / robust / fixed variants)
     test_paths = feats["path"].values[test_idx]
+    val_paths = feats["path"].values[val_idx]
+
+    def score_frames(meta, sv, st):
+        """Rows for the score file: validation scores (needed for thresholds set in advance) and test scores."""
+        return [pd.DataFrame({**meta, "split": "val", "path": val_paths, "score": sv}),
+                pd.DataFrame({**meta, "split": "test", "path": test_paths, "score": st})]
     peer_cache = {}   # (level, seed) -> sparse peer matrices for validation and test
 
     def peers_for(level, seed, fit_idx):
@@ -647,9 +653,8 @@ def main():
             seed_store.append((sv, s))
             s_f = fill_missing(s)
             if args.save_scores:
-                score_rows.append(pd.DataFrame({"level": level, "features": set_name, "detector": kind,
-                                                "variant": variant, "seed": seed, "path": test_paths,
-                                                "score": s_f}))
+                score_rows.extend(score_frames({"level": level, "features": set_name, "detector": kind,
+                                            "variant": variant, "seed": seed}, fill_missing(sv), s_f))
             seed_scores.append(to_ranks(s_f))
             seed_rows.append(point_metrics(s_f, y, w, hard, gd_fpr))
 
@@ -759,9 +764,10 @@ def main():
                         at = np.where(np.isnan(pt), np.nan, ot) if first == "ocsvm" else pt
                         sc = combine(av, at, ov, ot, y_val)
                         if args.save_scores:
-                            score_rows.append(pd.DataFrame({"level": level, "features": set_name, "detector": name,
-                                                            "variant": "combined", "seed": seed, "path": test_paths,
-                                                            "score": sc}))
+                            # validation releases calibrated against the same validation normals
+                            sc_v = combine(av, av, ov, ov, y_val)
+                            score_rows.extend(score_frames({"level": level, "features": set_name, "detector": name,
+                                                        "variant": "combined", "seed": seed}, sc_v, sc))
                         seed_scores.append(to_ranks(sc))
                         seed_rows.append(point_metrics(sc, y, w, hard, gd_fpr))
                     rows.append(summarise(level, f"{name} ({set_name})", "combined", set_name, name,

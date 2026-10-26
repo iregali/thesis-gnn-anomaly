@@ -522,7 +522,7 @@ def t_svdd():
 
 
 # ---------------------------------------------------------------------------
-# Revision (Oct 2026): operating points
+# Revision (Oct 2026): operating points, thresholds fixed in advance
 # (results/operating_points.csv from src/operating_points.py)
 # ---------------------------------------------------------------------------
 OPS_METHODS = [  # (label, method, calibrated)
@@ -574,6 +574,34 @@ def t_operating_grid():
                "dependency peers (Equation~\\ref{eq:calibration}). Contrastive models: depth and scorer chosen on "
                "validation; all detectors use the GuardDog features. At 0.5\\% FPR the threshold rests on about "
                "23 normal test releases.")
+
+
+def t_deployment():
+    d = read("operating_points")
+    if d is None:
+        return
+    rows = []
+    for i, lv in enumerate([0.0, 0.01]):
+        if i:
+            rows.append(r"\midrule")
+        rows.append(group_row(lv))
+        for lab, meth, cal in OPS_METHODS:
+            if ops_value(d, lv, meth, cal, "caught", 0.01) is None:
+                continue
+            cells = [lab]
+            for a in (0.005, 0.01):
+                cells += [pct(ops_value(d, lv, meth, cal, "deploy_fpr", a), 2),
+                          pct(ops_value(d, lv, meth, cal, "deploy_caught", a))]
+            cells += [pct(ops_value(d, lv, meth, cal, "caught", 0.01))]
+            rows.append(cells)
+    table("tab_deployment", "Thresholds fixed in advance: the threshold is set on the normal validation releases "
+          "for a target false-positive rate and applied unchanged to the test set.", "tab:deployment",
+          ["Detector", "0.5\\%: actual FPR", "0.5\\%: caught", "1\\%: actual FPR", "1\\%: caught",
+           "1\\%: caught, test threshold"], rows, "lccccc", size=r"\footnotesize",
+          note="0.5\\% and 1\\%: target false-positive rate. Actual FPR: share of normal test releases above the threshold. Caught: family-weighted share of "
+               "test malware above it. Caught, test threshold: "
+               "the convention of the other tables, with the threshold set on the normal test releases. Mean over "
+               "3 seeds. About 30 normal validation releases lie above the 1\\% threshold.")
 
 
 def f_fpr_curves():
@@ -774,6 +802,7 @@ def main():
     t_svdd()
     # revision (Oct 2026)
     t_operating_grid()
+    t_deployment()
     t_comparisons("paired_comparisons_ops", "tab_exploratory_ops", "Exploratory comparisons at the neighbouring "
                   "operating points 0.5\\% and 2\\% FPR (added in the revision; not pre-registered).",
                   "tab:exploratory-ops", "Same procedure and comparisons as Table~\\ref{tab:exploratory}, with the "
