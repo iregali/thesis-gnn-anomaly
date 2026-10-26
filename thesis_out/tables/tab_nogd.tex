@@ -1,0 +1,29 @@
+\begin{table}[htbp]
+\centering
+\footnotesize
+\caption{With and without the GuardDog features: ROC-AUC, share caught at 1\% FPR, and share caught of the malware no GuardDog rule detects.}
+\label{tab:nogd}
+\begin{adjustbox}{max width=\linewidth}
+\begin{tabular}{lcccccc}
+\toprule
+Detector & AUC, with & AUC, without & Caught, with & Caught, without & Hard, with & Hard, without \\
+\midrule
+\multicolumn{7}{l}{\textit{Clean training}} \\
+One-Class SVM & 0.963 & 0.929 & 73.9 & 57.3 & 32.7 & 39.8 \\
+One-Class SVM, per-group & 0.962 & 0.927 & 74.6 & 59.3 & 34.3 & 40.6 \\
+Isolation Forest & 0.944 & 0.894 & 41.2 & 22.0 & 19.9 & 8.7 \\
+Triplet + GIN, base & 0.961 & 0.921 & 74.3 & 43.2 & 37.3 & 39.4 \\
+Triplet + GIN, N3 & 0.963 & 0.923 & 74.9 & 52.9 & 22.9 & 40.4 \\
+\midrule
+\multicolumn{7}{l}{\textit{1\% contamination}} \\
+One-Class SVM & 0.951 & 0.894 & 34.9 & 18.0 & 7.8 & 33.4 \\
+One-Class SVM, per-group & 0.953 & 0.892 & 62.6 & 20.9 & 11.3 & 35.0 \\
+Isolation Forest & 0.946 & 0.892 & 53.8 & 18.7 & 20.1 & 21.0 \\
+Triplet + GIN, base & 0.935 & 0.880 & 30.0 & 14.7 & 31.1 & 21.8 \\
+Triplet + GIN, N3 & 0.958 & 0.882 & 62.5 & 17.8 & 7.0 & 7.2 \\
+\bottomrule
+\end{tabular}
+\end{adjustbox}
+\par\smallskip
+\parbox{0.95\linewidth}{\footnotesize With / without: all features, or all features except the GuardDog counts (code issues and the five rule groups). The contrastive models without GuardDog reuse the training settings chosen with it; depth and scorer are chosen on validation. Test set, family-weighted, mean over 3 seeds.}
+\end{table}

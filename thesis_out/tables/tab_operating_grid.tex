@@ -1,0 +1,51 @@
+\begin{table}[htbp]
+\centering
+\footnotesize
+\caption{Share of malware caught (\%) at four false-positive rates, by contamination level: raw-feature detectors and Triplet + GIN with and without the proposed loss, with plain and per-group calibrated scores.}
+\label{tab:operating-grid}
+\begin{adjustbox}{max width=\linewidth}
+\begin{tabular}{lcccccc}
+\toprule
+Detector & 0.5\% & 1\% & 2\% & 5\% & Hard, 1\% & ROC-AUC \\
+\midrule
+\multicolumn{7}{l}{\textit{Clean training}} \\
+One-Class SVM & 47.3 & 73.9 & 76.3 & 84.7 & 32.7 & 0.963 \\
+One-Class SVM, per-group & 47.5 & 74.6 & 77.9 & 85.0 & 34.3 & 0.962 \\
+Isolation Forest & 24.1 & 41.2 & 63.5 & 77.8 & 19.9 & 0.944 \\
+Triplet + GIN, base & 63.4 & 74.3 & 78.8 & 85.5 & 37.3 & 0.961 \\
+Triplet + GIN, base, per-group & 53.9 & 72.5 & 77.5 & 84.2 & 35.0 & 0.959 \\
+Triplet + GIN, N3 & 67.0 & 74.9 & 81.5 & 86.9 & 22.9 & 0.963 \\
+Triplet + GIN, N3, per-group & 68.2 & 74.7 & 79.5 & 86.7 & 27.1 & 0.960 \\
+\midrule
+\multicolumn{7}{l}{\textit{1\% contamination}} \\
+One-Class SVM & 10.9 & 34.9 & 72.6 & 79.7 & 7.8 & 0.951 \\
+One-Class SVM, per-group & 34.6 & 62.6 & 73.6 & 79.8 & 11.3 & 0.953 \\
+Isolation Forest & 26.5 & 53.8 & 64.6 & 78.8 & 20.1 & 0.946 \\
+Triplet + GIN, base & 20.4 & 30.0 & 41.8 & 75.3 & 31.1 & 0.935 \\
+Triplet + GIN, base, per-group & 17.7 & 26.8 & 33.7 & 49.8 & 34.1 & 0.920 \\
+Triplet + GIN, N3 & 59.4 & 62.5 & 68.7 & 81.7 & 7.0 & 0.958 \\
+Triplet + GIN, N3, per-group & 59.7 & 64.5 & 69.9 & 81.4 & 9.4 & 0.954 \\
+\midrule
+\multicolumn{7}{l}{\textit{2\% contamination}} \\
+One-Class SVM & 6.5 & 17.9 & 61.8 & 77.1 & 8.7 & 0.944 \\
+One-Class SVM, per-group & 27.3 & 37.7 & 71.1 & 77.1 & 11.2 & 0.947 \\
+Isolation Forest & 25.4 & 49.2 & 64.3 & 78.5 & 25.4 & 0.943 \\
+Triplet + GIN, base & 23.2 & 32.2 & 48.1 & 72.3 & 8.2 & 0.922 \\
+Triplet + GIN, base, per-group & 22.4 & 29.8 & 38.1 & 70.6 & 26.4 & 0.912 \\
+Triplet + GIN, N3 & 49.0 & 57.7 & 65.9 & 80.7 & 9.3 & 0.952 \\
+Triplet + GIN, N3, per-group & 44.6 & 51.8 & 64.4 & 80.7 & 11.4 & 0.948 \\
+\midrule
+\multicolumn{7}{l}{\textit{5\% contamination}} \\
+One-Class SVM & 4.4 & 9.1 & 12.9 & 69.4 & 4.3 & 0.928 \\
+One-Class SVM, per-group & 4.2 & 8.2 & 12.9 & 47.7 & 4.3 & 0.920 \\
+Isolation Forest & 6.2 & 30.0 & 57.1 & 76.5 & 13.6 & 0.938 \\
+Triplet + GIN, base & 7.1 & 18.7 & 54.4 & 71.1 & 2.6 & 0.923 \\
+Triplet + GIN, base, per-group & 5.6 & 11.4 & 25.3 & 69.4 & 23.8 & 0.922 \\
+Triplet + GIN, N3 & 15.4 & 27.2 & 54.1 & 73.1 & 7.1 & 0.931 \\
+Triplet + GIN, N3, per-group & 13.5 & 22.2 & 27.2 & 65.3 & 26.6 & 0.922 \\
+\bottomrule
+\end{tabular}
+\end{adjustbox}
+\par\smallskip
+\parbox{0.95\linewidth}{\footnotesize Test set, family-weighted; mean over 3 seeds (at levels above 0, each seed is a different contamination draw). Threshold: the (1 $-$ FPR) quantile of the normal test scores. Hard: malware on which no GuardDog rule fires. Per-group: scores calibrated within the subgroups with and without dependency peers (Equation~\ref{eq:calibration}). Contrastive models: depth and scorer chosen on validation; all detectors use the GuardDog features. At 0.5\% FPR the threshold rests on about 23 normal test releases.}
+\end{table}

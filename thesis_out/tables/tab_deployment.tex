@@ -1,0 +1,33 @@
+\begin{table}[htbp]
+\centering
+\footnotesize
+\caption{Thresholds fixed in advance: the threshold is set on the normal validation releases for a target false-positive rate and applied unchanged to the test set.}
+\label{tab:deployment}
+\begin{adjustbox}{max width=\linewidth}
+\begin{tabular}{lcccccc}
+\toprule
+Detector & 0.5\%: actual FPR & 0.5\%: caught & 1\%: actual FPR & 1\%: caught & 1\%: caught, test threshold & 1\%: hard \\
+\midrule
+\multicolumn{7}{l}{\textit{Clean training}} \\
+One-Class SVM & 0.75 & 71.9 & 1.42 & 75.6 & 73.9 & 35.7 \\
+One-Class SVM, per-group & 0.86 & 73.4 & 1.42 & 75.8 & 74.6 & 35.5 \\
+Isolation Forest & 0.69 & 26.4 & 1.46 & 58.6 & 41.2 & 28.3 \\
+Triplet + GIN, base & 0.81 & 71.0 & 1.22 & 75.4 & 74.3 & 38.2 \\
+Triplet + GIN, base, per-group & 0.66 & 62.1 & 1.44 & 74.3 & 72.5 & 37.0 \\
+Triplet + GIN, N3 & 0.67 & 69.2 & 1.09 & 75.9 & 74.9 & 24.6 \\
+Triplet + GIN, N3, per-group & 0.60 & 70.5 & 1.39 & 77.4 & 74.7 & 34.7 \\
+\midrule
+\multicolumn{7}{l}{\textit{1\% contamination}} \\
+One-Class SVM & 0.70 & 15.1 & 1.36 & 67.2 & 34.9 & 28.4 \\
+One-Class SVM, per-group & 0.77 & 51.9 & 1.37 & 66.3 & 62.6 & 14.2 \\
+Isolation Forest & 0.59 & 32.2 & 1.45 & 60.0 & 53.8 & 27.8 \\
+Triplet + GIN, base & 0.69 & 23.8 & 1.24 & 36.4 & 30.0 & 36.0 \\
+Triplet + GIN, base, per-group & 0.75 & 23.9 & 1.34 & 29.0 & 26.8 & 35.4 \\
+Triplet + GIN, N3 & 0.79 & 61.4 & 1.33 & 64.1 & 62.5 & 8.3 \\
+Triplet + GIN, N3, per-group & 0.69 & 62.0 & 1.48 & 67.5 & 64.5 & 11.7 \\
+\bottomrule
+\end{tabular}
+\end{adjustbox}
+\par\smallskip
+\parbox{0.95\linewidth}{\footnotesize 0.5\% and 1\%: target false-positive rate. Actual FPR: share of normal test releases above the threshold. Caught: family-weighted share of test malware above it; Hard: the same on malware no GuardDog rule detects. Caught, test threshold: the convention of the other tables, with the threshold set on the normal test releases. Mean over 3 seeds. About 30 normal validation releases lie above the 1\% threshold.}
+\end{table}
