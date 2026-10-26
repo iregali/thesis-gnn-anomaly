@@ -287,11 +287,12 @@ def t_comparisons(fname, name, caption, label, note):
     rows = []
     for fam, g in d.groupby("family", sort=False):
         fam_lab = {"primary": "Primary (pre-registered)", "ablation": "Ablation (pre-registered)",
-                   "expl_vs_base": "Proposed loss vs its base", "expl_vs_raw": "Proposed loss vs raw-feature detectors"
-                   }.get(fam, fam)
+                   "expl_vs_base": "Proposed loss vs its base", "expl_vs_raw": "Proposed loss vs raw-feature detectors",
+                   "expl_fpr05": "Proposed loss vs raw-feature detectors, caught at 0.5% FPR",
+                   "expl_fpr2": "Proposed loss vs raw-feature detectors, caught at 2% FPR"}.get(fam, fam)
         rows.append(f"\\multicolumn{{6}}{{l}}{{\\textit{{{esc(fam_lab)} ({len(g)} tests, Holm)}}}} \\\\")
         for r in g.itertuples():
-            pctm = r.metric == "tpr1_fw"
+            pctm = str(r.metric).startswith("tpr")
             fmt = (lambda v: f"{100 * v:+.1f}") if pctm else (lambda v: f"{v:+.3f}")
             val = (lambda v: f"{100 * v:.1f}") if pctm else (lambda v: f"{v:.3f}")
             sig = r"$^{*}$" if r.significant else ""
@@ -520,6 +521,101 @@ def t_svdd():
                "above only in summing the neighbours.")
 
 
+# ---------------------------------------------------------------------------
+# Revision (Oct 2026): operating points
+# (results/operating_points.csv from src/operating_points.py)
+# ---------------------------------------------------------------------------
+OPS_METHODS = [  # (label, method, calibrated)
+    ("One-Class SVM", "One-Class SVM", False),
+    ("One-Class SVM, per-group", "One-Class SVM", True),
+    ("Isolation Forest", "Isolation Forest", False),
+    ("Triplet + GIN, base", "Triplet + GIN, base", False),
+    ("Triplet + GIN, base, per-group", "Triplet + GIN, base", True),
+    ("Triplet + GIN, N3", "Triplet + GIN, N3", False),
+    ("Triplet + GIN, N3, per-group", "Triplet + GIN, N3", True),
+]
+
+
+def group_row(lv, ncol=6):
+    lab = "Clean training" if lv == 0 else f"{int(round(100 * lv))}\\% contamination"
+    return f"\\multicolumn{{{ncol}}}{{l}}{{\\textit{{{lab}}}}} \\\\"
+
+
+def ops_value(d, level, method, calibrated, metric, alpha, guarddog=True, field="mean"):
+    m = d[np.isclose(d["level"].astype(float), level) & (d["method"] == method)
+          & (d["calibrated"].astype(str).str.lower() == str(calibrated).lower())
+          & (d["guarddog"].astype(str).str.lower() == str(guarddog).lower())
+          & (d["metric"] == metric) & np.isclose(d["alpha"].astype(float), alpha)]
+    return m[field].iloc[0] if len(m) else None
+
+
+def t_operating_grid():
+    d = read("operating_points")
+    if d is None:
+        return
+    rows = []
+    for i, lv in enumerate([0.0, 0.01, 0.02, 0.05]):
+        if i:
+            rows.append(r"\midrule")
+        rows.append(group_row(lv))
+        for lab, meth, cal in OPS_METHODS:
+            vals = [ops_value(d, lv, meth, cal, "caught", a) for a in (0.005, 0.01, 0.02, 0.05)]
+            if all(v is None for v in vals):
+                continue
+            rows.append([lab] + [pct(v) for v in vals] + [f3(ops_value(d, lv, meth, cal, "auc", 0.0))])
+    table("tab_operating_grid", "Share of malware caught (\\%) at four false-positive rates, by contamination "
+          "level: raw-feature detectors and Triplet + GIN with and without the proposed loss, with plain and "
+          "per-group calibrated scores.", "tab:operating-grid",
+          ["Detector", "0.5\\%", "1\\%", "2\\%", "5\\%", "ROC-AUC"], rows, "lccccc",
+          size=r"\footnotesize",
+          note="Test set, family-weighted; mean over 3 seeds (at levels above 0, each seed is a different "
+               "contamination draw). Threshold: the (1 $-$ FPR) quantile of the normal test scores. "
+               "Per-group: scores calibrated within the subgroups with and without "
+               "dependency peers (Equation~\\ref{eq:calibration}). Contrastive models: depth and scorer chosen on "
+               "validation; all detectors use the GuardDog features. At 0.5\\% FPR the threshold rests on about "
+               "23 normal test releases.")
+
+
+def f_fpr_curves():
+    import matplotlib.pyplot as plt
+    d = read("operating_points")
+    if d is None:
+        return
+    series = [("Triplet + GIN, N3", "Triplet + GIN, N3", False, C["blue"], "-"),
+              ("Triplet + GIN, N3, per-group", "Triplet + GIN, N3", True, C["blue"], ":"),
+              ("Triplet + GIN, base", "Triplet + GIN, base", False, C["orange"], "-"),
+              ("OCSVM, per-group", "One-Class SVM", True, C["aqua"], "--"),
+              ("OCSVM", "One-Class SVM", False, C["magenta"], "--"),
+              ("Isolation Forest", "Isolation Forest", False, C["yellow"], "--")]
+    fig, axes = plt.subplots(1, 2, figsize=(6.4, 2.9), sharey=True)
+    for ax, lv in zip(axes, [0.0, 0.01]):
+        for lab, meth, cal, col, ls in series:
+            m = d[np.isclose(d["level"].astype(float), lv) & (d["method"] == meth)
+                  & (d["calibrated"].astype(str).str.lower() == str(cal).lower())
+                  & (d["guarddog"].astype(str).str.lower() == "true") & (d["metric"] == "caught")]
+            if not len(m):
+                continue
+            m = m.sort_values("alpha")
+            x, y, e = 100 * m["alpha"].values, 100 * m["mean"].values, 100 * m["sd"].fillna(0).values
+            ax.plot(x, y, color=col, linestyle=ls, linewidth=2 if ls == "-" else 1.4, label=lab)
+            if ls == "-":
+                ax.fill_between(x, y - e, y + e, color=col, alpha=0.12, linewidth=0)
+        ax.axvline(1.0, color=C["ink2"], linewidth=0.8, linestyle=":")
+        ax.axvspan(0.2, 0.5, color=C["grid"], alpha=0.5, linewidth=0, zorder=0)
+        ax.set_xscale("log")
+        ax.set_xticks([0.2, 0.5, 1, 2, 5], ["0.2", "0.5", "1", "2", "5"])
+        ax.minorticks_off()
+        ax.set_xlim(0.2, 5)
+        ax.set_title("Clean training" if lv == 0 else "1% contamination", loc="left")
+        ax.set_xlabel("False-positive rate (%, log scale)")
+    axes[0].set_ylabel("Caught (%)")
+    axes[0].set_ylim(0, 100)
+    handles, labels = axes[0].get_legend_handles_labels()
+    fig.legend(handles, labels, frameon=False, ncol=3, loc="upper center", bbox_to_anchor=(0.5, 1.12))
+    save(fig, "fig_fpr_curves")
+    plt.close(fig)
+
+
 def style():
     import matplotlib as mpl
     mpl.rcParams.update({
@@ -676,12 +772,19 @@ def main():
     t_label_noise()
     t_operating()
     t_svdd()
+    # revision (Oct 2026)
+    t_operating_grid()
+    t_comparisons("paired_comparisons_ops", "tab_exploratory_ops", "Exploratory comparisons at the neighbouring "
+                  "operating points 0.5\\% and 2\\% FPR (added in the revision; not pre-registered).",
+                  "tab:exploratory-ops", "Same procedure and comparisons as Table~\\ref{tab:exploratory}, with the "
+                  "threshold at 0.5\\% or 2\\% FPR.")
 
     style()
     f_contamination()
     f_sensitivity()
     f_learning_curve()
     f_newloss_encoders()
+    f_fpr_curves()
 
     doc = [r"\documentclass[11pt]{article}", r"\usepackage[a4paper,margin=2cm]{geometry}",
            r"\usepackage{booktabs}", r"\usepackage{graphicx}", r"\usepackage{adjustbox}", r"\begin{document}"]

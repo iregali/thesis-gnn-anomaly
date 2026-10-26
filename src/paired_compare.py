@@ -40,7 +40,8 @@ Method specs in the json
       the candidate with the highest mean validation pAUC (contrastive only),
       i.e. chosen on validation, never on test
 
-Metrics: auc_fw (family-weighted ROC-AUC), tpr1_fw (family-weighted share of
+Metrics: auc_fw (family-weighted ROC-AUC); tpr05_fw / tpr2_fw / tpr5_fw (the same share caught
+at 0.5% / 2% / 5% FPR, revision); tpr1_fw (family-weighted share of
 malware caught at 1% FPR, threshold = 99th percentile of the resampled normals).
 
 Usage
@@ -58,22 +59,28 @@ import pandas as pd
 from sklearn.metrics import roc_auc_score
 
 METRICS = ("auc_fw", "tpr1_fw")
+# share caught at other false-positive rates (revision): metric name -> FPR
+TPR_METRICS = {"tpr05_fw": 0.005, "tpr1_fw": 0.01, "tpr2_fw": 0.02, "tpr5_fw": 0.05}
 
 
 # ---------------------------------------------------------------------------
 # Statistics (pure functions, tested on synthetic data)
 # ---------------------------------------------------------------------------
-def tpr1_fw(s, y, w):
-    thr = np.quantile(s[y == 0], 0.99)
+def tpr_fw(s, y, w, fpr=0.01):
+    thr = np.quantile(s[y == 0], 1 - fpr)
     pos = y == 1
     return float(np.sum(w[pos] * (s[pos] > thr)) / np.sum(w[pos]))
+
+
+def tpr1_fw(s, y, w):
+    return tpr_fw(s, y, w, 0.01)
 
 
 def metric(name, s, y, w):
     if name == "auc_fw":
         return roc_auc_score(y, s, sample_weight=w)
-    if name == "tpr1_fw":
-        return tpr1_fw(s, y, w)
+    if name in TPR_METRICS:
+        return tpr_fw(s, y, w, TPR_METRICS[name])
     raise ValueError(name)
 
 
@@ -256,6 +263,8 @@ def run(spec_file, results_dir, test_data, boot=None, seed_resample=None):
           f"({len(set(fam[y == 1]))} families) | {n_boot} paired resamples | training seeds "
           f"{'resampled' if seed_resample else 'fixed'}", flush=True)
     cache, rows = {}, []
+    # every metric any comparison asks for (the bootstrap draws do not depend on this list)
+    metrics = tuple(dict.fromkeys(list(METRICS) + [c["metric"] for cs in spec["families"].values() for c in cs]))
     for family, comps in spec["families"].items():
         fam_rows = []
         for c in comps:
@@ -265,7 +274,7 @@ def run(spec_file, results_dir, test_data, boot=None, seed_resample=None):
                 B, lb = load_scores(c["b"], results_dir, paths)
                 print(f"  computing {la} vs {lb}", flush=True)
                 pair = seed_resample and same_draws(c["a"], c["b"]) and len(A) == len(B)
-                cache[key] = (la, lb, paired_bootstrap(A, B, y, w, boots, seed_resample=seed_resample,
+                cache[key] = (la, lb, paired_bootstrap(A, B, y, w, boots, metrics=metrics, seed_resample=seed_resample,
                                                        seed=spec.get("bootstrap_seed", 0), pair_seeds=pair))
             la, lb, res = cache[key]
             r = res[c["metric"]]
@@ -285,7 +294,7 @@ def run(spec_file, results_dir, test_data, boot=None, seed_resample=None):
     for fam_name, g in out.groupby("family", sort=False):
         print(f"\n=== {fam_name}: {len(g)} comparisons, Holm at alpha {spec.get('alpha', 0.05)} ===")
         for r in g.itertuples():
-            pct = r.metric == "tpr1_fw"
+            pct = r.metric in TPR_METRICS
             f = (lambda v: f"{100 * v:+.1f} pts") if pct else (lambda v: f"{v:+.3f}")
             g_ = (lambda v: f"{100 * v:.1f}%") if pct else (lambda v: f"{v:.3f}")
             print(f"{r.id:5s} {r.metric:8s} {r.a} = {g_(r.a_value)} vs {r.b} = {g_(r.b_value)}: "

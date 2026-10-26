@@ -1,0 +1,338 @@
+{
+ "_about": "EXPLORATORY comparisons added in the revision (26 Oct 2026, after the supervisors' feedback): the comparisons R1-R9 of exploratory_contamination.json repeated at the neighbouring operating points 0.5% and 2% FPR. Written after all results were seen: exploratory, Holm within each family, no confirmatory claim. Run with: python src/paired_compare.py --spec config/exploratory_operating_points.json --tag _ops",
+ "_conventions": "As exploratory_contamination.json. Raw detectors from baseline_protocol.py --save-scores --tag _ops (slurm/ops_scores.sh; same contamination draws per seed as the graph bundles). Threshold recomputed from the resampled normals at the given FPR. At 0.5% FPR the threshold rests on about 23 normal test releases.",
+ "alpha": 0.05,
+ "boot": 5000,
+ "seed_resample": true,
+ "bootstrap_seed": 0,
+ "families": {
+  "expl_fpr05": [
+   {
+    "id": "F1",
+    "metric": "tpr05_fw",
+    "question": "1% contamination, caught at 0.5% FPR: Triplet + GIN N3 vs raw OCSVM with per-group thresholds",
+    "a": {
+     "type": "contrastive",
+     "tag": "_triplet_gin_n3",
+     "level": 0.01
+    },
+    "b": {
+     "type": "baseline",
+     "tag": "_ops",
+     "level": 0.01,
+     "detector": "OCSVM (subgroup-calibrated)",
+     "variant": "combined",
+     "features": "static+deps+names+GuardDog"
+    }
+   },
+   {
+    "id": "F2",
+    "metric": "tpr05_fw",
+    "question": "1% contamination, caught at 0.5% FPR: Triplet + GIN N3 vs raw OCSVM",
+    "a": {
+     "type": "contrastive",
+     "tag": "_triplet_gin_n3",
+     "level": 0.01
+    },
+    "b": {
+     "type": "baseline",
+     "tag": "_ops",
+     "level": 0.01,
+     "detector": "OCSVM",
+     "variant": "naive",
+     "features": "static+deps+names+GuardDog"
+    }
+   },
+   {
+    "id": "F3",
+    "metric": "tpr05_fw",
+    "question": "1% contamination, caught at 0.5% FPR: Triplet + GIN N3 vs raw Isolation Forest",
+    "a": {
+     "type": "contrastive",
+     "tag": "_triplet_gin_n3",
+     "level": 0.01
+    },
+    "b": {
+     "type": "baseline",
+     "tag": "_ops",
+     "level": 0.01,
+     "detector": "IF",
+     "variant": "naive",
+     "features": "static+deps+names+GuardDog"
+    }
+   },
+   {
+    "id": "F4",
+    "metric": "tpr05_fw",
+    "question": "2% contamination, caught at 0.5% FPR: Triplet + GIN N3 vs raw OCSVM with per-group thresholds",
+    "a": {
+     "type": "contrastive",
+     "tag": "_triplet_gin_n3_c25",
+     "level": 0.02
+    },
+    "b": {
+     "type": "baseline",
+     "tag": "_ops",
+     "level": 0.02,
+     "detector": "OCSVM (subgroup-calibrated)",
+     "variant": "combined",
+     "features": "static+deps+names+GuardDog"
+    }
+   },
+   {
+    "id": "F5",
+    "metric": "tpr05_fw",
+    "question": "2% contamination, caught at 0.5% FPR: Triplet + GIN N3 vs raw OCSVM",
+    "a": {
+     "type": "contrastive",
+     "tag": "_triplet_gin_n3_c25",
+     "level": 0.02
+    },
+    "b": {
+     "type": "baseline",
+     "tag": "_ops",
+     "level": 0.02,
+     "detector": "OCSVM",
+     "variant": "naive",
+     "features": "static+deps+names+GuardDog"
+    }
+   },
+   {
+    "id": "F6",
+    "metric": "tpr05_fw",
+    "question": "2% contamination, caught at 0.5% FPR: Triplet + GIN N3 vs raw Isolation Forest",
+    "a": {
+     "type": "contrastive",
+     "tag": "_triplet_gin_n3_c25",
+     "level": 0.02
+    },
+    "b": {
+     "type": "baseline",
+     "tag": "_ops",
+     "level": 0.02,
+     "detector": "IF",
+     "variant": "naive",
+     "features": "static+deps+names+GuardDog"
+    }
+   },
+   {
+    "id": "F7",
+    "metric": "tpr05_fw",
+    "question": "5% contamination, caught at 0.5% FPR: Triplet + GIN N3 vs raw OCSVM with per-group thresholds",
+    "a": {
+     "type": "contrastive",
+     "tag": "_triplet_gin_n3_c25",
+     "level": 0.05
+    },
+    "b": {
+     "type": "baseline",
+     "tag": "_ops",
+     "level": 0.05,
+     "detector": "OCSVM (subgroup-calibrated)",
+     "variant": "combined",
+     "features": "static+deps+names+GuardDog"
+    }
+   },
+   {
+    "id": "F8",
+    "metric": "tpr05_fw",
+    "question": "5% contamination, caught at 0.5% FPR: Triplet + GIN N3 vs raw OCSVM",
+    "a": {
+     "type": "contrastive",
+     "tag": "_triplet_gin_n3_c25",
+     "level": 0.05
+    },
+    "b": {
+     "type": "baseline",
+     "tag": "_ops",
+     "level": 0.05,
+     "detector": "OCSVM",
+     "variant": "naive",
+     "features": "static+deps+names+GuardDog"
+    }
+   },
+   {
+    "id": "F9",
+    "metric": "tpr05_fw",
+    "question": "5% contamination, caught at 0.5% FPR: Triplet + GIN N3 vs raw Isolation Forest",
+    "a": {
+     "type": "contrastive",
+     "tag": "_triplet_gin_n3_c25",
+     "level": 0.05
+    },
+    "b": {
+     "type": "baseline",
+     "tag": "_ops",
+     "level": 0.05,
+     "detector": "IF",
+     "variant": "naive",
+     "features": "static+deps+names+GuardDog"
+    }
+   }
+  ],
+  "expl_fpr2": [
+   {
+    "id": "G1",
+    "metric": "tpr2_fw",
+    "question": "1% contamination, caught at 2% FPR: Triplet + GIN N3 vs raw OCSVM with per-group thresholds",
+    "a": {
+     "type": "contrastive",
+     "tag": "_triplet_gin_n3",
+     "level": 0.01
+    },
+    "b": {
+     "type": "baseline",
+     "tag": "_ops",
+     "level": 0.01,
+     "detector": "OCSVM (subgroup-calibrated)",
+     "variant": "combined",
+     "features": "static+deps+names+GuardDog"
+    }
+   },
+   {
+    "id": "G2",
+    "metric": "tpr2_fw",
+    "question": "1% contamination, caught at 2% FPR: Triplet + GIN N3 vs raw OCSVM",
+    "a": {
+     "type": "contrastive",
+     "tag": "_triplet_gin_n3",
+     "level": 0.01
+    },
+    "b": {
+     "type": "baseline",
+     "tag": "_ops",
+     "level": 0.01,
+     "detector": "OCSVM",
+     "variant": "naive",
+     "features": "static+deps+names+GuardDog"
+    }
+   },
+   {
+    "id": "G3",
+    "metric": "tpr2_fw",
+    "question": "1% contamination, caught at 2% FPR: Triplet + GIN N3 vs raw Isolation Forest",
+    "a": {
+     "type": "contrastive",
+     "tag": "_triplet_gin_n3",
+     "level": 0.01
+    },
+    "b": {
+     "type": "baseline",
+     "tag": "_ops",
+     "level": 0.01,
+     "detector": "IF",
+     "variant": "naive",
+     "features": "static+deps+names+GuardDog"
+    }
+   },
+   {
+    "id": "G4",
+    "metric": "tpr2_fw",
+    "question": "2% contamination, caught at 2% FPR: Triplet + GIN N3 vs raw OCSVM with per-group thresholds",
+    "a": {
+     "type": "contrastive",
+     "tag": "_triplet_gin_n3_c25",
+     "level": 0.02
+    },
+    "b": {
+     "type": "baseline",
+     "tag": "_ops",
+     "level": 0.02,
+     "detector": "OCSVM (subgroup-calibrated)",
+     "variant": "combined",
+     "features": "static+deps+names+GuardDog"
+    }
+   },
+   {
+    "id": "G5",
+    "metric": "tpr2_fw",
+    "question": "2% contamination, caught at 2% FPR: Triplet + GIN N3 vs raw OCSVM",
+    "a": {
+     "type": "contrastive",
+     "tag": "_triplet_gin_n3_c25",
+     "level": 0.02
+    },
+    "b": {
+     "type": "baseline",
+     "tag": "_ops",
+     "level": 0.02,
+     "detector": "OCSVM",
+     "variant": "naive",
+     "features": "static+deps+names+GuardDog"
+    }
+   },
+   {
+    "id": "G6",
+    "metric": "tpr2_fw",
+    "question": "2% contamination, caught at 2% FPR: Triplet + GIN N3 vs raw Isolation Forest",
+    "a": {
+     "type": "contrastive",
+     "tag": "_triplet_gin_n3_c25",
+     "level": 0.02
+    },
+    "b": {
+     "type": "baseline",
+     "tag": "_ops",
+     "level": 0.02,
+     "detector": "IF",
+     "variant": "naive",
+     "features": "static+deps+names+GuardDog"
+    }
+   },
+   {
+    "id": "G7",
+    "metric": "tpr2_fw",
+    "question": "5% contamination, caught at 2% FPR: Triplet + GIN N3 vs raw OCSVM with per-group thresholds",
+    "a": {
+     "type": "contrastive",
+     "tag": "_triplet_gin_n3_c25",
+     "level": 0.05
+    },
+    "b": {
+     "type": "baseline",
+     "tag": "_ops",
+     "level": 0.05,
+     "detector": "OCSVM (subgroup-calibrated)",
+     "variant": "combined",
+     "features": "static+deps+names+GuardDog"
+    }
+   },
+   {
+    "id": "G8",
+    "metric": "tpr2_fw",
+    "question": "5% contamination, caught at 2% FPR: Triplet + GIN N3 vs raw OCSVM",
+    "a": {
+     "type": "contrastive",
+     "tag": "_triplet_gin_n3_c25",
+     "level": 0.05
+    },
+    "b": {
+     "type": "baseline",
+     "tag": "_ops",
+     "level": 0.05,
+     "detector": "OCSVM",
+     "variant": "naive",
+     "features": "static+deps+names+GuardDog"
+    }
+   },
+   {
+    "id": "G9",
+    "metric": "tpr2_fw",
+    "question": "5% contamination, caught at 2% FPR: Triplet + GIN N3 vs raw Isolation Forest",
+    "a": {
+     "type": "contrastive",
+     "tag": "_triplet_gin_n3_c25",
+     "level": 0.05
+    },
+    "b": {
+     "type": "baseline",
+     "tag": "_ops",
+     "level": 0.05,
+     "detector": "IF",
+     "variant": "naive",
+     "features": "static+deps+names+GuardDog"
+    }
+   }
+  ]
+ }
+}

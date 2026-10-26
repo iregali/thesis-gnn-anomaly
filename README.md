@@ -115,6 +115,7 @@ Scripts are in `src/`, Slurm job scripts in `slurm/`.
 | 18. Controls | `train_contrastive.py`, `learning_curve_raw.py`, `train_ocgnn.py` | `capacity_control.sh`, `learning_curve.sh`, `learning_curve_raw.sh`, `ocgnn_rescale.sh`, `ocgnn_transformers.sh` | `*_d0_dim*`, `*_lc*`, `learning_curve_raw.csv`, `ocgnn_*` |
 | 19. Diagnostics | `sensitivity_check.py`, `train_contrastive.py` | `sensitivity_check.sh`, `augmentation_checks.sh` | `sensitivity_check_*`, `*_mask*`, `*_tau*` |
 | 20. Label noise | `label_noise_check.py` | `label_noise.sh` | `label_noise_summary.csv` |
+| 22. Revision, point 3: detection across operating points | `operating_points.py`, `paired_compare.py` (0.5 / 2 / 5% FPR) | `ops_scores.sh`, `operating_points.sh`, `paired_compare_ops.sh` | `operating_points.csv`, `paired_comparisons_ops.csv` |
 | 21. Tables and figures | `make_tables_figures.py` | (no Slurm, runs anywhere) | `thesis_out/` |
 
 Supporting modules: `gnn_eval.py` (shared evaluation), `train_ocgnn.py`
