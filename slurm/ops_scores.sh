@@ -5,7 +5,7 @@
 #SBATCH --time=10:00:00
 #SBATCH --output=logs/%x_%j.out
 # Revision (Oct 2026): per-seed VALIDATION and test scores of the raw detectors at every contamination level,
-# for src/operating_points.py (detection across false-positive rates,
+# with and without the GuardDog features, for src/operating_points.py (detection across false-positive rates,
 # thresholds fixed in advance on validation normals) and config/exploratory_operating_points.json.
 # OCSVM, Isolation Forest, and OCSVM with per-group thresholds (needs PEER for the subgroups).
 # Same settings selection and contamination draws as every baseline run: the 1% FPR numbers must match
@@ -14,4 +14,4 @@ source ~/setup_env.sh
 cd ~/thesis/thesis-gnn-anomaly
 source venv/bin/activate
 python src/baseline_protocol.py --levels 0 0.01 0.02 0.05 --variants naive --detectors OCSVM PEER IF \
-    --feature-sets static+deps+names+GuardDog --boot 100 --tag _ops --save-scores
+    --feature-sets static+deps+names static+deps+names+GuardDog --boot 100 --tag _ops --save-scores

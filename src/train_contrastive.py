@@ -69,6 +69,10 @@ The shifted copy of a package re-uses the sampled neighbourhood, neighbour dropp
 feature mask of its second view, and only unmasked features are shifted, so the copy
 differs from the positive view in the shifted features alone.
 
+Revision check: --drop-features guarddog removes the GuardDog columns (code_issue_count and the five
+rule groups) from every node before training, so the encoder, the context profiles and the rarity
+shifts never see them (slurm/no_guarddog.sh).
+
 Outputs (RESULTS_DIR): contrastive_results{tag}.csv, contrastive_settings{tag}.csv
 (validation pAUC per depth / scorer / setting, chosen row marked),
 contrastive_scores{tag}.csv (level, seed, depth, scorer, split, path, score).
@@ -98,7 +102,7 @@ from sklearn.svm import OneClassSVM
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from baseline_protocol import LOF_NEIGHBORS, OCSVM_GAMMA, OCSVM_NU, RESULTS_DIR, SELECT_MAX_FPR  # noqa: E402
-from build_graph import load_bundle  # noqa: E402
+from build_graph import GD_COLS, load_bundle  # noqa: E402
 from gnn_eval import Evaluator, train_subset  # noqa: E402
 from train_cola import ScoringGraph, bundle_path  # noqa: E402
 from train_ocgnn import DIM, FANOUT, OCGNN, gather, memory, sample_tree  # noqa: E402
@@ -107,6 +111,24 @@ from structure_rarity import (RarityShifter, connectivity_groups, dgi_sr, group_
 
 LEVELS = [0.0, 0.01]
 SEEDS = [0, 1, 2]
+DROP_GROUPS = {"guarddog": GD_COLS}   # --drop-features: feature groups removed from every node
+
+
+def drop_feature_columns(b, groups):
+    """Remove whole feature groups from a freshly loaded bundle (training, held-out and context rows),
+    before ScoringGraph is built, so rescaling, context profiles and the rarity shifts never see them.
+    Used for the revision check without the GuardDog features."""
+    names = list(b["feature_names"])
+    drop = [c for g in groups for c in DROP_GROUPS[g]]
+    missing = sorted(set(drop) - set(names))
+    if missing:
+        raise SystemExit(f"--drop-features: columns not in the bundle: {missing}")
+    keep = torch.tensor([i for i, n in enumerate(names) if n not in drop])
+    b["graph"].x = b["graph"].x[:, keep]
+    b["x_heldout"] = b["x_heldout"][:, keep]
+    b["x_context"] = b["x_context"][:, keep]
+    b["feature_names"] = [names[i] for i in keep.tolist()]
+    return b
 DEPTHS = [0, 1, 2]
 SCORERS = ["IF", "LOF", "OCSVM"]
 
@@ -487,6 +509,8 @@ def main():
     ap.add_argument("--shift-k", type=int, default=1, help="shifted copies per package")
     ap.add_argument("--shift-nfeat", type=int, default=1, help="features changed per shifted copy")
     ap.add_argument("--shift-weight", type=float, default=1.0, help="InfoNCE lambda / triplet beta (unused for DGI)")
+    ap.add_argument("--drop-features", nargs="*", default=[], choices=sorted(DROP_GROUPS),
+                    help="remove feature groups from every node (revision: guarddog)")
     ap.add_argument("--tag", default=None)
     args = ap.parse_args()
     args.levels = sorted(args.levels)
@@ -516,6 +540,11 @@ def main():
             key = path if args.train_frac >= 1.0 else (path, seed)
             if key not in graphs:
                 b = load_bundle(path)
+                if args.drop_features:
+                    n_before = len(b["feature_names"])
+                    b = drop_feature_columns(b, args.drop_features)
+                    print(f"  dropped {', '.join(args.drop_features)}: {n_before} -> {len(b['feature_names'])} "
+                          f"features", flush=True)
                 if args.train_frac < 1.0:
                     b = subsample_bundle(b, args.train_frac, seed)
                 graphs[key] = (ScoringGraph(b, args.context_features, args.context_min_users, args.rescale), b)

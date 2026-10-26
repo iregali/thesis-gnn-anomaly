@@ -2,7 +2,8 @@
 operating_points.py  (revision, October 2026)
 Detection across operating points, and with a threshold fixed in advance, from the saved per-package
 scores. Answers the supervisors' points on the contamination results (neighbouring false-positive
-rates, subgroup calibration of the proposed model) and on the practical meaning of the threshold.
+rates, subgroup calibration of the proposed model), on the practical meaning of the threshold, and on
+GuardDog (GuardDog-hard malware at several operating points; models without the GuardDog features).
 No training: it only re-reads score files.
 
 For every method x contamination level x training seed:
@@ -10,18 +11,19 @@ For every method x contamination level x training seed:
   caught         share of malware caught (family-weighted) at FPR alpha, threshold = (1 - alpha)
                  quantile of the NORMAL TEST scores (the convention of the thesis, eq. 9);
                  alpha on a grid from 0.2% to 5% (detection-vs-FPR curve)
+  caught_hard    the same on the GuardDog-hard malware (no GuardDog rule fires), threshold from all normals
   caught_ens     caught of the rank-averaged seed ensemble (as Table 6)
   deploy_*       threshold fixed IN ADVANCE: (1 - alpha) quantile of the normal VALIDATION scores, applied
                  unchanged to the test set; deploy_fpr = the false-positive rate it actually gives on the
-                 normal test releases, deploy_caught = what it catches
+                 normal test releases, deploy_caught / deploy_caught_hard = what it catches
 Reported as mean and sd over the 3 seeds (+ per-seed values), for plain and subgroup-calibrated scores.
 
 Methods (skipped with a message when their score file is missing)
   raw detectors   baseline_protocol_scores_ops.csv (slurm/ops_scores.sh): One-Class SVM, its per-group
-                  calibrated variant, Isolation Forest (all features, GuardDog included)
+                  calibrated variant, Isolation Forest; with and without the GuardDog features
   contrastive     contrastive_scores{tag}.csv, configuration chosen on validation per level
                   (contrastive_settings{tag}.csv, as paired_compare.py): Triplet + GIN tuned base and N3
-                  (2% / 5%: tags _c25);
+                  (2% / 5%: tags _c25), and the runs without GuardDog (tags _nogd, slurm/no_guarddog.sh);
                   calibrated with the same per-subgroup calibration as the raw detectors
                   (gnn_eval.Evaluator.calibrated; peers among the training releases of the seed's bundle)
 
@@ -29,7 +31,7 @@ Check: the plain and calibrated caught at 1% FPR must reproduce contrastive_resu
 (tpr1_fw_seed_mean); the script prints both.
 
 Outputs (RESULTS_DIR): operating_points.csv (long format, one row per method x level x metric x alpha)
-Usage:  python src/operating_points.py            (Snellius, after ops_scores.sh)
+Usage:  python src/operating_points.py            (Snellius, after ops_scores.sh and no_guarddog.sh)
 """
 
 import argparse
@@ -43,7 +45,7 @@ from sklearn.metrics import roc_auc_score
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from baseline_protocol import RESULTS_DIR, combine, to_ranks  # noqa: E402
 
-GD = "static+deps+names+GuardDog"
+GD, NOGD = "static+deps+names+GuardDog", "static+deps+names"
 LEVELS = [0.0, 0.01, 0.02, 0.05]
 TABLE_ALPHAS = [0.005, 0.01, 0.02, 0.05]
 CURVE_ALPHAS = sorted({float(a) for a in np.round(np.geomspace(0.002, 0.05, 15), 5)} | set(TABLE_ALPHAS))
@@ -57,8 +59,10 @@ def _c25(base):
 CONTRASTIVE = [
     ("Triplet + GIN, base", True, _c25("_triplet_gin_tuned")),
     ("Triplet + GIN, N3", True, _c25("_triplet_gin_n3")),
+    ("Triplet + GIN, base", False, {0.0: "_triplet_gin_tuned_nogd", 0.01: "_triplet_gin_tuned_nogd"}),
+    ("Triplet + GIN, N3", False, {0.0: "_triplet_gin_n3_nogd", 0.01: "_triplet_gin_n3_nogd"}),
 ]
-# (method, calibrated?, detector, variant) in baseline_protocol_scores_ops.csv (GuardDog features)
+# (method, calibrated?, detector, variant) in baseline_protocol_scores_ops.csv, for both feature sets
 BASELINES = [
     ("One-Class SVM", False, "OCSVM", "naive"),
     ("One-Class SVM", True, "OCSVM (subgroup-calibrated)", "combined"),
@@ -73,21 +77,24 @@ def _wshare(hit, w):
     return float(np.sum(w * hit) / np.sum(w)) if len(w) else np.nan
 
 
-def seed_metrics(sv, st, y_val, y, w, curve_alphas=CURVE_ALPHAS, table_alphas=TABLE_ALPHAS):
+def seed_metrics(sv, st, y_val, y, w, hard, curve_alphas=CURVE_ALPHAS, table_alphas=TABLE_ALPHAS):
     """Metrics of one seed. sv / st: validation / test scores (higher = more anomalous), in the order
-    of y_val / y. w: family weights of the test releases.
+    of y_val / y. w: family weights of the test releases; hard: GuardDog-hard malware mask.
     Returns {(metric, alpha): value}."""
     out = {("auc", 0.0): float(roc_auc_score(y, st, sample_weight=w))}   # family-weighted ROC-AUC
     neg, pos = st[y == 0], y == 1
-    s_pos, w_pos = st[pos], w[pos]
+    s_pos, w_pos, h_pos = st[pos], w[pos], hard[pos]
     v_neg = sv[y_val == 0]
     for a in curve_alphas:
         out[("caught", a)] = _wshare(s_pos > np.quantile(neg, 1 - a), w_pos)
     for a in table_alphas:
+        hit = s_pos > np.quantile(neg, 1 - a)
+        out[("caught_hard", a)] = _wshare(hit[h_pos], w_pos[h_pos])
         thr_v = np.quantile(v_neg, 1 - a)            # fixed in advance, on validation normals
         out[("deploy_fpr", a)] = float(np.mean(neg > thr_v))
         hit_v = s_pos > thr_v
         out[("deploy_caught", a)] = _wshare(hit_v, w_pos)
+        out[("deploy_caught_hard", a)] = _wshare(hit_v[h_pos], w_pos[h_pos])
     return out
 
 
@@ -221,12 +228,13 @@ def main():
     args = ap.parse_args()
     from gnn_eval import Evaluator
     ev = Evaluator(boot=0)
-    y_val, y, w = ev.y_val, ev.y, ev.w
+    y_val, y, w, hard = ev.y_val, ev.y, ev.w, ev.hard
+    print(f"GuardDog-hard test malware: {int(hard.sum())} releases")
     flags = None if args.no_calibration else PeerFlags(ev)
     rows = []
 
     def add(level, method, calibrated, guarddog, source, config, seeds):
-        per = [seed_metrics(sv, st, y_val, y, w) for sv, st in seeds.values()]
+        per = [seed_metrics(sv, st, y_val, y, w, hard) for sv, st in seeds.values()]
         ens = ensemble_metrics([st for _, st in seeds.values()], y, w)
         for r in summarise(per, ens):
             rows.append({"level": level, "method": method, "calibrated": calibrated, "guarddog": guarddog,
@@ -234,19 +242,20 @@ def main():
         m1 = float(np.mean([p[("caught", 0.01)] for p in per]))
         dep = float(np.mean([p[("deploy_caught", 0.01)] for p in per]))
         fpr = float(np.mean([p[("deploy_fpr", 0.01)] for p in per]))
-        print(f"  {level:.0%} | {method}{', calibrated' if calibrated else ''}"
+        print(f"  {level:.0%} | {method}{', calibrated' if calibrated else ''}{'' if guarddog else ', no GuardDog'}"
               f" [{config}]: caught@1% {m1:.1%} | threshold from validation: FPR {fpr:.2%}, caught {dep:.1%}",
               flush=True)
         return m1
 
     for level in args.levels:
         print(f"\n=== contamination {level:.0%} ===", flush=True)
-        for method, calib, det, var in BASELINES:
-            seeds = baseline_seeds(det, var, GD, level, ev.val_paths, ev.test_paths)
-            if seeds is None:
-                print(f"  [skip] {method}: no scores in baseline_protocol_scores_ops.csv")
-                continue
-            add(level, method, calib, True, f"{det} / {var}", GD, seeds)
+        for gd_on, feats in [(True, GD), (False, NOGD)]:
+            for method, calib, det, var in BASELINES:
+                seeds = baseline_seeds(det, var, feats, level, ev.val_paths, ev.test_paths)
+                if seeds is None:
+                    print(f"  [skip] {method} ({feats}): no scores in baseline_protocol_scores_ops.csv")
+                    continue
+                add(level, method, calib, gd_on, f"{det} / {var}", feats, seeds)
         for method, gd_on, tags in CONTRASTIVE:
             tag = tags.get(level)
             if tag is None:
@@ -272,7 +281,8 @@ def main():
 
     pd.set_option("display.width", 220)
     t = out[(out["metric"] == "caught") & out["alpha"].isin(TABLE_ALPHAS)].copy()
-    t["name"] = t["method"] + np.where(t["calibrated"], ", calibrated", "")
+    t["name"] = (t["method"] + np.where(t["calibrated"], ", calibrated", "")
+                 + np.where(t["guarddog"], "", ", no GuardDog"))
     piv = t.pivot_table(index=["level", "name"], columns="alpha", values="mean", sort=False)
     print("\n=== Caught (seed mean) at each FPR ===")
     print((100 * piv).round(1).to_string())

@@ -522,7 +522,7 @@ def t_svdd():
 
 
 # ---------------------------------------------------------------------------
-# Revision (Oct 2026): operating points, thresholds fixed in advance
+# Revision (Oct 2026): operating points, thresholds fixed in advance, models without GuardDog
 # (results/operating_points.csv from src/operating_points.py)
 # ---------------------------------------------------------------------------
 OPS_METHODS = [  # (label, method, calibrated)
@@ -536,7 +536,7 @@ OPS_METHODS = [  # (label, method, calibrated)
 ]
 
 
-def group_row(lv, ncol=6):
+def group_row(lv, ncol=7):
     lab = "Clean training" if lv == 0 else f"{int(round(100 * lv))}\\% contamination"
     return f"\\multicolumn{{{ncol}}}{{l}}{{\\textit{{{lab}}}}} \\\\"
 
@@ -562,15 +562,17 @@ def t_operating_grid():
             vals = [ops_value(d, lv, meth, cal, "caught", a) for a in (0.005, 0.01, 0.02, 0.05)]
             if all(v is None for v in vals):
                 continue
-            rows.append([lab] + [pct(v) for v in vals] + [f3(ops_value(d, lv, meth, cal, "auc", 0.0))])
+            rows.append([lab] + [pct(v) for v in vals]
+                        + [pct(ops_value(d, lv, meth, cal, "caught_hard", 0.01)),
+                           f3(ops_value(d, lv, meth, cal, "auc", 0.0))])
     table("tab_operating_grid", "Share of malware caught (\\%) at four false-positive rates, by contamination "
           "level: raw-feature detectors and Triplet + GIN with and without the proposed loss, with plain and "
           "per-group calibrated scores.", "tab:operating-grid",
-          ["Detector", "0.5\\%", "1\\%", "2\\%", "5\\%", "ROC-AUC"], rows, "lccccc",
+          ["Detector", "0.5\\%", "1\\%", "2\\%", "5\\%", "Hard, 1\\%", "ROC-AUC"], rows, "lcccccc",
           size=r"\footnotesize",
           note="Test set, family-weighted; mean over 3 seeds (at levels above 0, each seed is a different "
-               "contamination draw). Threshold: the (1 $-$ FPR) quantile of the normal test scores. "
-               "Per-group: scores calibrated within the subgroups with and without "
+               "contamination draw). Threshold: the (1 $-$ FPR) quantile of the normal test scores. Hard: malware "
+               "on which no GuardDog rule fires. Per-group: scores calibrated within the subgroups with and without "
                "dependency peers (Equation~\\ref{eq:calibration}). Contrastive models: depth and scorer chosen on "
                "validation; all detectors use the GuardDog features. At 0.5\\% FPR the threshold rests on about "
                "23 normal test releases.")
@@ -592,16 +594,46 @@ def t_deployment():
             for a in (0.005, 0.01):
                 cells += [pct(ops_value(d, lv, meth, cal, "deploy_fpr", a), 2),
                           pct(ops_value(d, lv, meth, cal, "deploy_caught", a))]
-            cells += [pct(ops_value(d, lv, meth, cal, "caught", 0.01))]
+            cells += [pct(ops_value(d, lv, meth, cal, "caught", 0.01)),
+                      pct(ops_value(d, lv, meth, cal, "deploy_caught_hard", 0.01))]
             rows.append(cells)
     table("tab_deployment", "Thresholds fixed in advance: the threshold is set on the normal validation releases "
           "for a target false-positive rate and applied unchanged to the test set.", "tab:deployment",
           ["Detector", "0.5\\%: actual FPR", "0.5\\%: caught", "1\\%: actual FPR", "1\\%: caught",
-           "1\\%: caught, test threshold"], rows, "lccccc", size=r"\footnotesize",
+           "1\\%: caught, test threshold", "1\\%: hard"], rows, "lcccccc", size=r"\footnotesize",
           note="0.5\\% and 1\\%: target false-positive rate. Actual FPR: share of normal test releases above the threshold. Caught: family-weighted share of "
-               "test malware above it. Caught, test threshold: "
+               "test malware above it; Hard: the same on malware no GuardDog rule detects. Caught, test threshold: "
                "the convention of the other tables, with the threshold set on the normal test releases. Mean over "
                "3 seeds. About 30 normal validation releases lie above the 1\\% threshold.")
+
+
+def t_nogd():
+    d = read("operating_points")
+    if d is None:
+        return
+    meths = [("One-Class SVM", "One-Class SVM", False), ("One-Class SVM, per-group", "One-Class SVM", True),
+             ("Isolation Forest", "Isolation Forest", False), ("Triplet + GIN, base", "Triplet + GIN, base", False),
+             ("Triplet + GIN, N3", "Triplet + GIN, N3", False)]
+    rows = []
+    for i, lv in enumerate([0.0, 0.01]):
+        if i:
+            rows.append(r"\midrule")
+        rows.append(group_row(lv))
+        for lab, meth, cal in meths:
+            cells = [lab]
+            for metric, alpha in [("auc", 0.0), ("caught", 0.01), ("caught_hard", 0.01)]:
+                for gd in (True, False):
+                    v = ops_value(d, lv, meth, cal, metric, alpha, guarddog=gd)
+                    cells.append(f3(v) if metric == "auc" else pct(v))
+            if any(c != "--" for c in cells[1:]):
+                rows.append(cells)
+    table("tab_nogd", "With and without the GuardDog features: ROC-AUC, share caught at 1\\% FPR, and share caught "
+          "of the malware no GuardDog rule detects.", "tab:nogd",
+          ["Detector", "AUC, with", "AUC, without", "Caught, with", "Caught, without", "Hard, with",
+           "Hard, without"], rows, "lcccccc", size=r"\footnotesize",
+          note="With / without: all features, or all features except the GuardDog counts (code issues and the five "
+               "rule groups). The contrastive models without GuardDog reuse the training settings chosen with it; "
+               "depth and scorer are chosen on validation. Test set, family-weighted, mean over 3 seeds.")
 
 
 def f_fpr_curves():
@@ -803,6 +835,7 @@ def main():
     # revision (Oct 2026)
     t_operating_grid()
     t_deployment()
+    t_nogd()
     t_comparisons("paired_comparisons_ops", "tab_exploratory_ops", "Exploratory comparisons at the neighbouring "
                   "operating points 0.5\\% and 2\\% FPR (added in the revision; not pre-registered).",
                   "tab:exploratory-ops", "Same procedure and comparisons as Table~\\ref{tab:exploratory}, with the "
