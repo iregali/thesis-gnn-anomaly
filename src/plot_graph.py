@@ -15,6 +15,7 @@ colouring. Runs on a login node in a few seconds.
 
   python src/plot_graph.py                                 # graph_c05_s0.pt, 300 releases
   python src/plot_graph.py --bundle graph_c00_s0.pt --sample 400 --seed 1
+  python src/plot_graph.py --sample 150 --min-shared 1     # also draw one-off dependencies
 Output: thesis_out/figures/fig_graph.{pdf,png}
 """
 import argparse
@@ -44,7 +45,7 @@ def isolated_shares(n_eval, dep_src, dep_dst, is_contam, heldout_split, heldout_
 
 
 def draw(n_eval, n_nodes, dep_src, dep_dst, is_contam, names, shares, sample=300, seed=0,
-         n_labels=6, out=OUT, title_note=""):
+         n_labels=6, out=OUT, title_note="", min_shared=2):
     import matplotlib
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
@@ -65,6 +66,10 @@ def draw(n_eval, n_nodes, dep_src, dep_dst, is_contam, names, shares, sample=300
     G = nx.Graph()
     G.add_nodes_from(pick.tolist())
     G.add_edges_from(keep)
+    # context nodes used by fewer than min_shared sampled releases add only a fringe of leaves
+    if min_shared > 1:
+        G.remove_nodes_from([n for n in list(G.nodes()) if n >= n_eval and G.degree(n) < min_shared])
+        G.remove_nodes_from(list(nx.isolates(G)))
     # small separate components would be pushed to the margins: draw the largest one
     n_before = G.number_of_nodes()
     G = G.subgraph(max(nx.connected_components(G), key=len)).copy()
@@ -80,18 +85,27 @@ def draw(n_eval, n_nodes, dep_src, dep_dst, is_contam, names, shares, sample=300
     nx.draw_networkx_edges(G, pos, ax=ax, width=0.35, alpha=0.35, edge_color="#777777")
     size_ctx = 6 + 60 * np.sqrt(in_deg[nodes[ctx]] / max(in_deg[n_eval:].max(), 1))
     ax.scatter(*np.array([pos[n] for n in nodes[ctx]]).T, s=size_ctx, c=COL_CTX, edgecolors="white",
-               linewidths=0.4, zorder=2, label="Context node (dependency target that is not a sampled release)")
+               linewidths=0.4, zorder=2, label="Context node shared by sampled releases")
     ax.scatter(*np.array([pos[n] for n in nodes[norm]]).T, s=9, c=COL_NORMAL, zorder=3,
                label="Normal release")
     if mal.any():
         ax.scatter(*np.array([pos[n] for n in nodes[mal]]).T, s=22, c=COL_MAL, marker="D", zorder=4,
                    edgecolors="white", linewidths=0.4, label="Hidden malware (contamination)")
     hubs = nodes[ctx][np.argsort(-in_deg[nodes[ctx]])][:n_labels]
+    # spread labels: each label goes to the free side, away from labels already placed
+    placed = []
+    offsets = [(8, 8), (8, -14), (-8, 8), (-8, -14), (14, -3), (-14, -3)]
+    span = np.ptp(np.array([pos[n] for n in nodes]), axis=0).max() or 1.0
     for h in hubs:
         x, y = pos[h]
-        ax.annotate(names[h], (x, y), xytext=(4, 4), textcoords="offset points", fontsize=8,
-                    color="#333333", zorder=5,
-                    bbox=dict(boxstyle="round,pad=0.15", fc="white", ec="none", alpha=0.75))
+        best = max(offsets, key=lambda o: min([np.hypot(x + o[0] * span / 400 - px, y + o[1] * span / 400 - py)
+                                               for px, py in placed] or [1e9]))
+        lx, ly = x + best[0] * span / 400, y + best[1] * span / 400
+        placed.append((lx, ly))
+        ax.annotate(names[h], (x, y), xytext=best, textcoords="offset points", fontsize=8,
+                    ha="left" if best[0] > 0 else "right", va="center", color="#222222", zorder=5,
+                    arrowprops=dict(arrowstyle="-", color="#555555", lw=0.5),
+                    bbox=dict(boxstyle="round,pad=0.15", fc="white", ec="none", alpha=0.85))
     ax.set_axis_off()
     ax.set_title(f"(a) Sample of connected releases and their dependencies{title_note}",
                  fontsize=10, loc="left")
@@ -126,6 +140,8 @@ def main():
     ap.add_argument("--bundle", default="graph_c05_s0.pt", help="file name in DATA_DIR, or a path")
     ap.add_argument("--sample", type=int, default=300, help="connected releases to draw")
     ap.add_argument("--seed", type=int, default=0)
+    ap.add_argument("--min-shared", type=int, default=2,
+                    help="draw only context nodes used by at least this many sampled releases (1 = all)")
     args = ap.parse_args()
 
     from build_graph import load_bundle
@@ -144,7 +160,7 @@ def main():
         np.array([b["node_of_name"].get(n) in b["dependents"] for n in h["name"]]))
     lvl = b["config"]["contam"]
     draw(n_eval, g.num_nodes, src, dst, is_contam, names, shares, args.sample, args.seed,
-         title_note=f" ({lvl:.0%} contamination)" if lvl else "")
+         title_note=f" ({lvl:.0%} contamination)" if lvl else "", min_shared=args.min_shared)
 
 
 if __name__ == "__main__":
