@@ -1,0 +1,29 @@
+\begin{table}[htbp]
+\centering
+\footnotesize
+\caption{Malware on which no GuardDog rule fires: share caught (\%) at four false-positive rates, with and without the GuardDog features.}
+\label{tab:hard-ops}
+\begin{adjustbox}{max width=\linewidth}
+\begin{tabular}{lcccccccc}
+\toprule
+& \multicolumn{4}{c}{With GuardDog features} & \multicolumn{4}{c}{Without GuardDog features} \\ \cmidrule(lr){2-5}\cmidrule(lr){6-9} Detector & 0.5\% & 1\% & 2\% & 5\% & 0.5\% & 1\% & 2\% & 5\% \\
+\midrule
+\multicolumn{9}{l}{\textit{Clean training}} \\
+One-Class SVM & 26.7 & 32.7 & 36.3 & 46.5 & 34.4 & 39.8 & 43.4 & 52.8 \\
+One-Class SVM, per-group & 27.1 & 34.3 & 41.1 & 47.6 & 35.5 & 40.6 & 44.0 & 53.3 \\
+Isolation Forest & 4.0 & 19.9 & 32.9 & 43.4 & 3.5 & 8.7 & 33.5 & 43.7 \\
+Triplet + GIN, base & 14.3 & 37.3 & 40.1 & 51.6 & 31.0 & 39.4 & 42.8 & 54.2 \\
+Triplet + GIN, N3 & 8.8 & 22.9 & 38.0 & 47.7 & 35.8 & 40.4 & 46.3 & 54.5 \\
+\midrule
+\multicolumn{9}{l}{\textit{1\% contamination}} \\
+One-Class SVM & 5.2 & 7.8 & 35.1 & 41.3 & 21.2 & 33.4 & 38.5 & 44.2 \\
+One-Class SVM, per-group & 6.9 & 11.3 & 35.3 & 41.5 & 12.8 & 35.0 & 39.8 & 44.8 \\
+Isolation Forest & 3.6 & 20.1 & 33.0 & 42.8 & 4.3 & 21.0 & 35.1 & 44.3 \\
+Triplet + GIN, base & 13.1 & 31.1 & 39.1 & 45.9 & 7.0 & 21.8 & 37.4 & 47.4 \\
+Triplet + GIN, N3 & 4.4 & 7.0 & 12.7 & 28.7 & 5.8 & 7.2 & 12.0 & 38.8 \\
+\bottomrule
+\end{tabular}
+\end{adjustbox}
+\par\smallskip
+\parbox{0.95\linewidth}{\footnotesize Family-weighted share of the GuardDog-hard test malware above the threshold; the threshold is the (1 $-$ FPR) quantile of all normal test scores, as in Table~\ref{tab:operating-grid}. Mean over 3 seeds. Contrastive models without GuardDog reuse the training settings chosen with it.}
+\end{table}

@@ -472,7 +472,9 @@ def t_operating():
           note="0.5\\%, 1\\%, 2\\%: share of malware caught at that false-positive rate. At GD FPR: caught at "
                "GuardDog's own false-positive rate. Hard: malware on which no GuardDog rule fires, caught at 1\\% "
                "FPR. Prec. 1:65: precision at 1\\% FPR (GuardDog: at its own FPR) for one malicious project in 65 "
-               "(PyPI 2025). Contrastive models: validation-chosen depth and scorer, ensemble of 3 seeds.")
+               "(PyPI 2025). Contrastive models: validation-chosen depth and scorer, ensemble of 3 seeds (seed means: "
+               "Table~\\ref{tab:operating-grid}). All thresholds are set on the normal test releases, so every "
+               "detector operates at exactly the stated rate; thresholds fixed in advance: Table~\\ref{tab:deployment}.")
 
 
 def t_svdd():
@@ -634,6 +636,36 @@ def t_nogd():
           note="With / without: all features, or all features except the GuardDog counts (code issues and the five "
                "rule groups). The contrastive models without GuardDog reuse the training settings chosen with it; "
                "depth and scorer are chosen on validation. Test set, family-weighted, mean over 3 seeds.")
+
+
+def t_hard_ops():
+    """GuardDog-hard malware at four false-positive rates, with and without the GuardDog features
+    (revision, point 5: what the detectors catch where no rule fires, across operating points)."""
+    d = read("operating_points")
+    if d is None:
+        return
+    meths = [("One-Class SVM", "One-Class SVM", False), ("One-Class SVM, per-group", "One-Class SVM", True),
+             ("Isolation Forest", "Isolation Forest", False), ("Triplet + GIN, base", "Triplet + GIN, base", False),
+             ("Triplet + GIN, N3", "Triplet + GIN, N3", False)]
+    alphas = (0.005, 0.01, 0.02, 0.05)
+    rows = []
+    for i, lv in enumerate([0.0, 0.01]):
+        if i:
+            rows.append(r"\midrule")
+        rows.append(group_row(lv, ncol=9))
+        for lab, meth, cal in meths:
+            cells = [lab] + [pct(ops_value(d, lv, meth, cal, "caught_hard", a, guarddog=gd))
+                             for gd in (True, False) for a in alphas]
+            if any(c != "--" for c in cells[1:]):
+                rows.append(cells)
+    table("tab_hard_ops", "Malware on which no GuardDog rule fires: share caught (\\%) at four false-positive "
+          "rates, with and without the GuardDog features.", "tab:hard-ops",
+          [r"& \multicolumn{4}{c}{With GuardDog features} & \multicolumn{4}{c}{Without GuardDog features} \\"
+           r" \cmidrule(lr){2-5}\cmidrule(lr){6-9} Detector"] + [f"{a * 100:g}\\%" for a in alphas] * 2,
+          rows, "lcccccccc", size=r"\footnotesize",
+          note="Family-weighted share of the GuardDog-hard test malware above the threshold; the threshold is the "
+               "(1 $-$ FPR) quantile of all normal test scores, as in Table~\\ref{tab:operating-grid}. Mean over 3 "
+               "seeds. Contrastive models without GuardDog reuse the training settings chosen with it.")
 
 
 def f_fpr_curves():
@@ -836,6 +868,7 @@ def main():
     t_operating_grid()
     t_deployment()
     t_nogd()
+    t_hard_ops()
     t_comparisons("paired_comparisons_ops", "tab_exploratory_ops", "Exploratory comparisons at the neighbouring "
                   "operating points 0.5\\% and 2\\% FPR (added in the revision; not pre-registered).",
                   "tab:exploratory-ops", "Same procedure and comparisons as Table~\\ref{tab:exploratory}, with the "
